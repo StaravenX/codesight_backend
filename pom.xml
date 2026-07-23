@@ -79,11 +79,16 @@
         <version>4.1.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.test</groupId>
+    <groupId>com.codesight</groupId>
     <artifactId>codesight_backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>codesight_backend</name>
     <description>codesight_backend</description>
+    <packaging>pom</packaging>
+    <modules>
+        <module>app</module>
+        <module>user</module>
+    </modules>
     <url/>
     <licenses>
         <license/>
