@@ -17,21 +17,37 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @TableName("users")
 public class User {
+    
     @TableId(type = IdType.AUTO)
     private Long id;
+
     private String phone;
+
     private String email;
+
     private String passwordHash;
+
     private String nickname;
+
     private String avatar;
+
     private String bio;
+
     private String csId;
+
     private String gender;
+
     private LocalDate birthday;
+
     private String company;
+
     private String jobTitle;
+
     private String school;
+
     private String interestedDomains;
+
     private Instant createdTime;
+
     private Instant updatedTime;
 }
