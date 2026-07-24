@@ -1,8 +1,6 @@
 package com.codesight.user;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -64,8 +62,10 @@ public class User {
     private String interestedDomains;
     
     @Schema(description = "账号创建时间")
+    @TableField(fill = FieldFill.INSERT)
     private Instant createdTime;
     
     @Schema(description = "资料最后更新时间")
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private Instant updatedTime;
 }
