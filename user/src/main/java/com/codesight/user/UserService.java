@@ -15,6 +15,4 @@ public interface UserService extends IService<User> {
 
     boolean existsByEmail(String email);
 
-    void createUser(User user);
-
 }

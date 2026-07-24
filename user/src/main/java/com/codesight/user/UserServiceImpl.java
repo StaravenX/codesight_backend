@@ -2,9 +2,6 @@ package com.codesight.user;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
@@ -43,18 +40,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     public boolean existsByEmail(String email) {
         return lambdaQuery().eq(User::getEmail, email).exists();
-    }
-
-    /**
-     * 创建用户，写入创建与更新时间并持久化。
-     * @param user 待创建的用户实体。
-     */
-    @Transactional
-    public void createUser(User user) {
-        Instant now = Instant.now();
-        user.setCreatedTime(now);
-        user.setUpdatedTime(now);
-        save(user);
     }
 
 }
