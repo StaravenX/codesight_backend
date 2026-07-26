@@ -7,9 +7,9 @@
         <artifactId>codesight_backend</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>app</artifactId>
-    <name>app</name>
-    <description>app</description>
+    <name>auth</name>
+    <artifactId>auth</artifactId>
+    <description>auth</description>
     <url/>
     <licenses>
         <license/>
@@ -26,23 +26,18 @@
     <properties>
         <java.version>21</java.version>
     </properties>
-
     <dependencies>
         <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+
         <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>user</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>auth</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-        </dependency>
+
     </dependencies>
 
     <build>
