@@ -58,7 +58,7 @@ public class User {
     @Schema(description = "院校")
     private String school;
     
-    @Schema(description = "感兴趣的技术领域，JSON数组，如 ["Java","Spring","计算机网络","后端"]")
+    @Schema(description = "感兴趣的技术领域，JSON数组，如 ['Java','Spring','计算机网络','后端']")
     private String interestedDomains;
     
     @Schema(description = "账号创建时间")

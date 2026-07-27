@@ -1,3 +1,20 @@
 spring:
   application:
     name: auth
+auth:
+  jwt:
+    issuer: codesight
+    key-id: codesight-key
+    private-key: classpath:keys/private.pem
+    public-key: classpath:keys/public.pem
+    access-token-ttl: PT15M
+    refresh-token-ttl: P7D
+  verification:
+    code-length: 6
+    ttl: PT5M
+    max-attempts: 5
+    send-interval: PT60S
+    daily-limit: 10
+  password:
+    bcrypt-strength: 12
+    min-length: 8
