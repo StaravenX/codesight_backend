@@ -5,8 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import org.springframework.context.annotation.ComponentScan;
 
+import org.apache.ibatis.annotations.Mapper;
+import org.mybatis.spring.annotation.MapperScan;
+
 @SpringBootApplication
 @ComponentScan("com.codesight")
+@MapperScan(basePackages = "com.codesight", annotationClass = Mapper.class)
 public class CodeSightApplication {
 
 	public static void main(String[] args) {
