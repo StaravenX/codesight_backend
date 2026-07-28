@@ -1,4 +1,4 @@
-package com.codesight.auth.config;
+package com.codesight.auth.utils;
 
 import org.springframework.core.io.Resource;
 
