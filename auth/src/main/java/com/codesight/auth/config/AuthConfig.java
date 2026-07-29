@@ -1,6 +1,7 @@
 package com.codesight.auth.config;
 
-import com.codesight.auth.utils.PemUtils;
+import cn.hutool.crypto.PemUtil;
+import java.io.IOException;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -36,7 +37,6 @@ public class AuthConfig {
 
     /**
      * 创建密码编码器（BCrypt）。
-     *
      * @return 使用配置的强度构造的 {@link PasswordEncoder}。
      */
     @Bean
@@ -46,16 +46,14 @@ public class AuthConfig {
 
     /**
      * 创建 JWT 编码器。
-     *
      * <p>读取 RSA 私钥/公钥并构造 JWK，使用 Nimbus 实现生成 {@link JwtEncoder}。</p>
-     *
      * @return 基于 RSA JWK 的 {@link JwtEncoder}。
      */
     @Bean
-    public JwtEncoder jwtEncoder() {
+    public JwtEncoder jwtEncoder() throws IOException {
         AuthProperties.Jwt jwtProps = properties.getJwt();
-        RSAPrivateKey privateKey = PemUtils.readPrivateKey(jwtProps.getPrivateKey());
-        RSAPublicKey publicKey = PemUtils.readPublicKey(jwtProps.getPublicKey());
+        RSAPrivateKey privateKey = (RSAPrivateKey) PemUtil.readPemPrivateKey(jwtProps.getPrivateKey().getInputStream());
+        RSAPublicKey publicKey = (RSAPublicKey) PemUtil.readPemPublicKey(jwtProps.getPublicKey().getInputStream());
         // 使用privateKey签名，publicKey为规范要求
         RSAKey jwk = new RSAKey.Builder(publicKey)
                 .privateKey(privateKey)
@@ -67,15 +65,13 @@ public class AuthConfig {
 
     /**
      * 创建 JWT 解码器。
-     *
      * <p>读取 RSA 公钥并构造基于 Nimbus 的 {@link JwtDecoder}。</p>
-     *
      * @return 基于 RSA 公钥的 {@link JwtDecoder}。
      */
     @Bean
-    public JwtDecoder jwtDecoder() {
+    public JwtDecoder jwtDecoder() throws IOException {
         AuthProperties.Jwt jwtProps = properties.getJwt();
-        RSAPublicKey publicKey = PemUtils.readPublicKey(jwtProps.getPublicKey());
+        RSAPublicKey publicKey = (RSAPublicKey) PemUtil.readPemPublicKey(jwtProps.getPublicKey().getInputStream());
         // 使用publicKey解密
         return NimbusJwtDecoder.withPublicKey(publicKey).build();
     }
