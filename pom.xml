@@ -67,6 +67,13 @@
             <artifactId>hutool-all</artifactId>
             <version>5.8.47</version>
         </dependency>
+        
+        <!-- Bouncy Castle -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk15to18</artifactId>
+            <version>1.78.1</version>
+        </dependency>
 
 
         <dependency>
