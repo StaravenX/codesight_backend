@@ -12,6 +12,8 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 
+import com.codesight.common.exception.BusinessException;
+import com.codesight.common.exception.ErrorCode;
 /**
  * 基于 Redis 的验证码存储实现。
  * <p>
@@ -46,9 +48,22 @@ public class RedisVerificationCodeStore implements VerificationCodeStore {
         String key = buildKey(scene, identifier);
         HashOperations<String, String, String> ops = redisTemplate.opsForHash();
         try {
+            String currentAttempts = ops.get(key, FIELD_ATTEMPTS);
+            String currentMax = ops.get(key, FIELD_MAX_ATTEMPTS);
+            
+            if (currentAttempts != null && currentMax != null && 
+                Integer.parseInt(currentAttempts) >= Integer.parseInt(currentMax)
+            ) {
+                throw new BusinessException(ErrorCode.VERIFICATION_LOCKED);
+            }
+
             ops.put(key, FIELD_CODE, code);
             ops.put(key, FIELD_MAX_ATTEMPTS, String.valueOf(maxAttempts));
-            ops.put(key, FIELD_ATTEMPTS, "0");
+            
+            if (currentAttempts == null) {
+                ops.put(key, FIELD_ATTEMPTS, "0");
+            }
+            
             redisTemplate.expire(key, ttl);
         } catch (DataAccessException ex) {
             throw new RedisSystemException("Failed to save verification code", ex);
