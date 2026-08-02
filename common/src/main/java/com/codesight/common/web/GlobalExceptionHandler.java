@@ -3,6 +3,7 @@ package com.codesight.common.web;
 import com.codesight.common.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -26,6 +27,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusiness(BusinessException e) {
         return ResponseEntity.badRequest().body(Result.error(e.getErrorCode()));
+    }
+
+    /**
+     * 拦截参数校验异常 (MethodArgumentNotValidException)。
+     * 提取 DTO 校验注解上配置的 message，返回给前端。
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Result<Void>> handleValidationException(MethodArgumentNotValidException e) {
+        // 获取所有校验报错中的第一个报错信息
+        String errorMsg = e.getBindingResult().getAllErrors().getFirst().getDefaultMessage();
+        return ResponseEntity.badRequest().body(Result.error("BAD_REQUEST", errorMsg));
     }
 
     /**
