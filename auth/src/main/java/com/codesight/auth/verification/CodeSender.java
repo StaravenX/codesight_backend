@@ -1,6 +1,6 @@
 package com.codesight.auth.verification;
 
-import com.codesight.auth.verification.model.*;
+import com.codesight.auth.model.IdentifierType;
 
 /**
  * 验证码发送器接口。
@@ -14,9 +14,10 @@ public interface CodeSender {
      * 发送验证码到指定标识。
      *
      * @param scene         验证码场景（REGISTER/LOGIN/RESET_PASSWORD）。
+     * @param type          标识类型（PHONE/EMAIL）。
      * @param identifier    标识（手机号或邮箱）。
      * @param code          验证码内容。
      * @param expireMinutes 验证码有效期（分钟）。
      */
-    void sendCode(String scene, String identifier, String code, int expireMinutes);
+    void sendCode(String scene, IdentifierType type, String identifier, String code, int expireMinutes);
 }

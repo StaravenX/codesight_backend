@@ -1,5 +1,6 @@
 package com.codesight.auth.verification;
 
+import com.codesight.auth.model.IdentifierType;
 import com.codesight.auth.verification.model.*;
 
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,7 @@ public class LoggingCodeSender implements CodeSender {
      * @param expireMinutes 有效期（分钟）。
      */
     @Override
-    public void sendCode(String scene, String identifier, String code, int expireMinutes) {
-        log.info("Send verification code scene={} identifier={} code={} expireMinutes={}", scene, identifier, code, expireMinutes);
+    public void sendCode(String scene, IdentifierType type, String identifier, String code, int expireMinutes) {
+        log.info("Send verification code scene={} type={} identifier={} code={} expireMinutes={}", scene, type, identifier, code, expireMinutes);
     }
 }

@@ -1,12 +1,13 @@
 package com.codesight.auth.verification;
 
+import com.codesight.auth.model.IdentifierType;
 import com.codesight.auth.verification.model.*;
 
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
+import org.springframework.util.Assert;
 
 import com.codesight.auth.config.AuthProperties;
 import com.codesight.common.exception.BusinessException;
@@ -43,20 +44,21 @@ public class VerificationService {
      *
      * @param scene      验证码场景（REGISTER/LOGIN/RESET_PASSWORD）。
      * @param identifier 标识（手机号或邮箱）。
+     * @param type       标示类型
      * @return 发送结果，包含标识、场景与过期秒数。
      * @throws BusinessException 参数不完整或触发速率/日限额时抛出。
      */
-    public SendCodeResult sendCode(VerificationScene scene, String identifier) {
-        if (scene == null || !StringUtils.hasText(identifier)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请提供正确的验证码发送参数");
-        }
+    public SendCodeResult sendCode(VerificationScene scene, String identifier, IdentifierType type) {
+        Assert.notNull(scene, "scene must not be null");
+        Assert.notNull(type, "type must not be null");
+        Assert.hasText(identifier, "identifier must not be empty");
         AuthProperties.Verification cfg = properties.getVerification();
         enforceSendInterval(scene, identifier, cfg.getSendInterval());
         enforceDailyLimit(scene, identifier, cfg.getDailyLimit());
 
         String code = RandomUtil.randomNumbers(cfg.getCodeLength());
         codeManager.saveCode(scene.name(), identifier, code, cfg.getTtl(), cfg.getMaxAttempts());
-        codeSender.sendCode(scene.name(), identifier, code, (int) cfg.getTtl().toMinutes());
+        codeSender.sendCode(scene.name(), type, identifier, code, (int) cfg.getTtl().toMinutes());
         return new SendCodeResult(identifier, scene, (int) cfg.getTtl().toSeconds());
     }
 
@@ -70,9 +72,9 @@ public class VerificationService {
      * @throws BusinessException 参数不完整时抛出。
      */
     public VerificationCheckResult verifyCode(VerificationScene scene, String identifier, String code) {
-        if (scene == null || !StringUtils.hasText(identifier) || !StringUtils.hasText(code)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "验证码校验参数不完整");
-        }
+        Assert.notNull(scene, "scene must not be null");
+        Assert.hasText(identifier, "identifier must not be empty");
+        Assert.hasText(code, "code must not be empty");
         return codeManager.verifyCode(scene.name(), identifier, code);
     }
 
