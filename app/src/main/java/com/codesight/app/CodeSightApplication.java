@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
 
 @SpringBootApplication
-@MapperScan("com.codesight.**.mapper")
+@ComponentScan(basePackages = "com.codesight")
 @MapperScan(basePackages = "com.codesight", annotationClass = Mapper.class)
 public class CodeSightApplication {
 
