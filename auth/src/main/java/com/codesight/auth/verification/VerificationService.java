@@ -90,11 +90,9 @@ public class VerificationService {
             return;
         }
         String key = "auth:code:last:" + scene.name() + ":" + identifier;
-        String existing = stringRedisTemplate.opsForValue().get(key);
-        if (existing != null) {
+        if (Boolean.FALSE.equals(stringRedisTemplate.opsForValue().setIfAbsent(key, "1", interval))) {
             throw new BusinessException(ErrorCode.VERIFICATION_RATE_LIMIT);
         }
-        stringRedisTemplate.opsForValue().set(key, "1", interval);
     }
 
     /**
