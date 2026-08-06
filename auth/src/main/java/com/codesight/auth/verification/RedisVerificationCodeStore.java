@@ -71,41 +71,40 @@ public class RedisVerificationCodeStore implements VerificationCodeStore {
     }
 
     /**
-     * 校验验证码是否匹配，更新尝试计数并在成功时删除记录。
+     * 校验验证码是否匹配，更新尝试计数并在成功时删除记录，失败则抛出异常
      *
      * @param scene      场景名称。
      * @param identifier 标识（手机号或邮箱）。
      * @param code       用户输入的验证码。
-     * @return 校验结果（成功、未找到、错误、尝试过多）。
      */
     @Override
-    public VerificationCheckResult verifyCode(String scene, String identifier, String code) {
+    public void ensureVerified(String scene, String identifier, String code) {
         String key = buildKey(scene, identifier);
         HashOperations<String, String, String> ops = redisTemplate.opsForHash();
         Map<String, String> data = ops.entries(key);
         if (data.isEmpty()) {
-            return new VerificationCheckResult(VerificationCodeStatus.NOT_FOUND, 0, 0);
+            throw new BusinessException(ErrorCode.VERIFICATION_NOT_FOUND);
         }
         String storedCode = data.get(FIELD_CODE);
         int maxAttempts = parseInt(data.get(FIELD_MAX_ATTEMPTS), 5);
         int attempts = parseInt(data.get(FIELD_ATTEMPTS), 0);
 
         if (attempts >= maxAttempts) {
-            return new VerificationCheckResult(VerificationCodeStatus.TOO_MANY_ATTEMPTS, attempts, maxAttempts);
+            throw new BusinessException(ErrorCode.VERIFICATION_TOO_MANY_ATTEMPTS);
         }
 
         if (Objects.equals(storedCode, code)) {
             redisTemplate.delete(key);
-            return new VerificationCheckResult(VerificationCodeStatus.SUCCESS, attempts, maxAttempts);
+            return;
         }
 
         int updatedAttempts = attempts + 1;
         ops.put(key, FIELD_ATTEMPTS, String.valueOf(updatedAttempts));
         if (updatedAttempts >= maxAttempts) {
             redisTemplate.expire(key, Duration.ofMinutes(30));
-            return new VerificationCheckResult(VerificationCodeStatus.TOO_MANY_ATTEMPTS, updatedAttempts, maxAttempts);
+            throw new BusinessException(ErrorCode.VERIFICATION_TOO_MANY_ATTEMPTS);
         }
-        return new VerificationCheckResult(VerificationCodeStatus.MISMATCH, updatedAttempts, maxAttempts);
+        throw new BusinessException(ErrorCode.VERIFICATION_MISMATCH);
     }
 
     /**
