@@ -1,18 +1,9 @@
 package com.codesight.user;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.stereotype.Service;
 
-/**
- * 用户服务接口。
- */
-public interface UserService extends IService<User> {
-
-    User findByPhone(String phone);
-
-    User findByEmail(String email);
-
-    boolean existsByPhone(String phone);
-
-    boolean existsByEmail(String email);
-
+@Service
+public class UserService extends ServiceImpl<UserMapper, User> {
 }
+
