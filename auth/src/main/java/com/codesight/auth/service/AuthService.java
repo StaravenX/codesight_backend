@@ -4,12 +4,14 @@ import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.codesight.auth.api.dto.*;
+import java.util.Optional;
 import com.codesight.auth.audit.LoginLogService;
+import com.codesight.auth.audit.model.LoginChannel;
+import com.codesight.auth.audit.model.LoginStatus;
 import com.codesight.auth.config.AuthProperties;
 import com.codesight.auth.model.ClientInfo;
 import com.codesight.auth.model.IdentifierType;
 import com.codesight.auth.token.JwtService;
-import com.codesight.auth.token.RefreshTokenStore;
 import com.codesight.auth.token.TokenPair;
 import com.codesight.auth.verification.VerificationService;
 import com.codesight.auth.verification.model.SendCodeResult;
@@ -32,7 +34,6 @@ public class AuthService {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RefreshTokenStore refreshTokenStore;
     private final AuthProperties authProperties;
     private final LoginLogService loginLogService;
 
@@ -51,7 +52,7 @@ public class AuthService {
         String identifier = normalizeIdentifier(type, request.identifier());
 
         validateIdentifier(type, identifier);
-        boolean exists = identifierExists(type, identifier);
+        boolean exists = findByIdentifier(type, identifier).isPresent();
 
         if (scene == VerificationScene.REGISTER && exists) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "该账号已存在");
@@ -88,7 +89,7 @@ public class AuthService {
         String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
 
         // 4. 校验标识是否已存在
-        if (identifierExists(request.identifierType(), identifier)) {
+        if (findByIdentifier(request.identifierType(), identifier).isPresent()) {
             throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS);
         }
 
@@ -118,9 +119,61 @@ public class AuthService {
 
         // 8. 签发令牌并记录日志
         TokenPair tokenPair = jwtService.issueTokenPair(user);
-        refreshTokenStore.storeToken(user.getId(), tokenPair.refreshTokenId(), authProperties.getJwt().getRefreshTokenTtl());
-        loginLogService.save(user.getId(), identifier, "REGISTER", clientInfo.ip(), clientInfo.userAgent(),
-                "SUCCESS");
+        loginLogService.save(user.getId(), identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(),
+                LoginStatus.SUCCESS);
+
+        return new AuthResponse(new AuthUserResponse(user), new TokenResponse(tokenPair));
+    }
+
+    /**
+     * 密码登录
+     * @param request 登录请求，包含标识值、密码。
+     * @param clientInfo 客户端信息（IP/UA），用于登录审计。
+     * @return 认证响应，包含用户信息与令牌对。
+     */
+    public AuthResponse loginByPassword(@Valid LoginByPasswordRequest request, ClientInfo clientInfo) {
+        String identifier = request.identifier();
+        String password = request.password();
+        IdentifierType type = request.type();
+
+        normalizeIdentifier(type, identifier);
+        validateIdentifier(type, identifier);
+
+        User user = findByIdentifier(type, identifier)
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "密码错误");
+        }
+
+        TokenPair tokenPair = jwtService.issueTokenPair(user);
+        loginLogService.save(user.getId(), identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(),
+                LoginStatus.SUCCESS);
+                
+        return new AuthResponse(new AuthUserResponse(user), new TokenResponse(tokenPair));
+    }
+
+    /**
+     * 验证码登录
+     * @param request 登录请求，包含标识值、验证码。
+     * @param clientInfo 客户端信息（IP/UA），用于登录审计。
+     * @return 认证响应，包含用户信息与令牌对。
+     */
+    public AuthResponse loginByCode(@Valid LoginByCodeRequest request, ClientInfo clientInfo) {
+        String identifier = request.identifier();
+        IdentifierType type = request.type();
+
+        normalizeIdentifier(type, identifier);
+        validateIdentifier(type, identifier);
+
+        User user = findByIdentifier(type, identifier)
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
+
+        verificationService.ensureVerified(VerificationScene.LOGIN, identifier, request.code());
+
+        TokenPair tokenPair = jwtService.issueTokenPair(user);
+        loginLogService.save(user.getId(), identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(),
+                LoginStatus.SUCCESS);
 
         return new AuthResponse(new AuthUserResponse(user), new TokenResponse(tokenPair));
     }
@@ -135,15 +188,17 @@ public class AuthService {
     }
 
     /**
-     * 标识存在性查询
+     * 根据标识查找用户
      *
+     * @param type 标识类型
      * @param identifier 标识
-     * @return 标识是否存在
+     * @return 包含用户的 Optional 对象
      */
-    public boolean identifierExists(IdentifierType type, String identifier) {
-        return userService.lambdaQuery()
+    private Optional<User> findByIdentifier(IdentifierType type, String identifier) {
+        User user = userService.lambdaQuery()
                 .eq(type == IdentifierType.EMAIL ? User::getEmail : User::getPhone, identifier)
-                .exists();
+                .one();
+        return Optional.ofNullable(user);
     }
 
 
