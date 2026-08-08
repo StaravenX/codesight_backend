@@ -34,9 +34,10 @@ public class JwtService {
     private final JwtEncoder jwtEncoder;
     private final JwtDecoder jwtDecoder;
     private final AuthProperties properties;
+    private final RefreshTokenStore refreshTokenStore;
 
     /**
-     * 为指定用户签发一对 Access/Refresh Token。
+     * 为指定用户签发一对 Access/Refresh Token 并自动存入白名单。
      * <p>
      * 令牌类型通过 `token_type` 声明区分；Refresh Token 的 `jti` 用于白名单存储与撤销。
      * 过期时间取自配置 `AuthProperties.jwt`。
@@ -52,8 +53,21 @@ public class JwtService {
 
         String accessToken = encode(user, issuedAt, accessExpiresAt, "access", UUID.randomUUID().toString());
         String refreshToken = encode(user, issuedAt, refreshExpiresAt, "refresh", refreshTokenId);
+        
+        refreshTokenStore.storeToken(user.getId(), refreshTokenId, properties.getJwt().getRefreshTokenTtl());
+        
         return new TokenPair(accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, refreshTokenId);
     }
+
+    /**
+     * 撤销用户所有的 Refresh Token。
+     *
+     * @param userId 用户 ID。
+     */
+    public void revokeAll(long userId) {
+        refreshTokenStore.revokeAll(userId);
+    }
+
 
     /**
      * 解码 JWT 字符串为 {@link Jwt}。
