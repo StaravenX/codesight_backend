@@ -1,9 +1,6 @@
 package com.codesight.auth.api;
 
-import com.codesight.auth.api.dto.AuthResponse;
-import com.codesight.auth.api.dto.RegisterRequest;
-import com.codesight.auth.api.dto.SendCodeRequest;
-import com.codesight.auth.api.dto.SendCodeResponse;
+import com.codesight.auth.api.dto.*;
 import com.codesight.auth.model.ClientInfo;
 import com.codesight.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,4 +50,36 @@ public class AuthController {
     public AuthResponse register(@Valid @RequestBody RegisterRequest request, ClientInfo clientInfo) {
         return authService.register(request, clientInfo);
     }
+
+    /**
+     * 密码登录并获取令牌对。
+     * <p>
+     * 密码登录；成功后签发 Access/Refresh Token。
+     *
+     * @param request     请求体，包含：标识值、密码
+     * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
+     * @return 认证响应，包含用户信息与令牌对。
+     */
+    @PostMapping("/login/password")
+    @Operation(summary = "密码登录", description = "使用手机号/邮箱和密码登录")
+    public AuthResponse loginByPassword(@Valid @RequestBody LoginByPasswordRequest request, ClientInfo clientInfo) {
+        return authService.loginByPassword(request, clientInfo);
+    }
+
+    /**
+     * 验证码登录并获取令牌对。
+     * <p>
+     * 验证码登录；成功后签发 Access/Refresh Token。
+     *
+     * @param request     请求体，包含：标识值、验证码
+     * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
+     * @return 认证响应，包含用户信息与令牌对。
+     */
+    @PostMapping("/login/code")
+    @Operation(summary = "验证码登录", description = "使用手机号/邮箱和短信验证码登录")
+    public AuthResponse loginByCode(@Valid @RequestBody LoginByCodeRequest request, ClientInfo clientInfo) {
+        return authService.loginByCode(request, clientInfo);
+    }
+
+
 }
