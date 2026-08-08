@@ -1,6 +1,7 @@
 package com.codesight.auth.audit;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.codesight.auth.audit.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +21,7 @@ public class LoginLogService extends ServiceImpl<LoginLogMapper, LoginLog> {
      * @param status    结果：SUCCESS/FAILED。
      */
     @Transactional
-    public void save(Long userId, String identifier, String channel, String ip, String userAgent, String status) {
+    public void save(Long userId, String identifier, LoginChannel channel, String ip, String userAgent, LoginStatus status) {
         LoginLog log = LoginLog.builder()
                 .userId(userId)
                 .identifier(identifier)

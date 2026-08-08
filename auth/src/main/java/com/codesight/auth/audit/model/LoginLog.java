@@ -1,4 +1,4 @@
-package com.codesight.auth.audit;
+package com.codesight.auth.audit.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,13 +23,13 @@ public class LoginLog {
 
     private String identifier;
 
-    private String channel;
+    private LoginChannel channel;
 
     private String ip;
 
     private String userAgent;
 
-    private String status;
+    private LoginStatus status;
 
     @TableField(fill = FieldFill.INSERT)
     private Instant createdTime;
