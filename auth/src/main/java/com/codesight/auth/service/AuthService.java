@@ -92,24 +92,27 @@ public class AuthService {
             throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS);
         }
 
-        // 5. 校验验证码是否正确
+        // 5. 校验密码并加密（可选）
+        String passwordHash = null;
+        if (StringUtils.hasText(request.password())) {
+            validatePassword(request.password());
+            passwordHash = passwordEncoder.encode(request.password().trim());
+        }
+
+        // 6. 校验验证码是否正确
         verificationService.ensureVerified(VerificationScene.REGISTER, identifier, request.code());
 
-        // 6. 构造用户信息
+        // 7. 构造用户信息
         User user = User.builder()
                 .phone(request.identifierType() == IdentifierType.PHONE ? identifier : null)
                 .email(request.identifierType() == IdentifierType.EMAIL ? identifier : null)
+                .passwordHash(passwordHash)
                 .nickname(StringUtils.hasText(request.nickname()) ? request.nickname() : "User_" + RandomUtil.randomString(8).toUpperCase())
                 .csId("geek_" + RandomUtil.randomString(8).toLowerCase())
                 .avatar("default-avatar.png")
                 .interestedDomains("[]")
                 .build();
 
-        // 7. 校验并设置密码（可选）
-        if (StringUtils.hasText(request.password())) {
-            validatePassword(request.password());
-            user.setPasswordHash(passwordEncoder.encode(request.password().trim()));
-        }
 
         userService.save(user);
 
