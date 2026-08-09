@@ -8,6 +8,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -40,11 +43,12 @@ public class SecurityConfig {
          * - 公开认证接口与健康检查，其余接口需鉴权；
          * - 启用资源服务器的 JWT 校验。
          * @param http Spring 的 {@link HttpSecurity} 构建器。
+         * @param jwtDecoder 全局 JWT 解码器
          * @return 构建完成的 {@link SecurityFilterChain}。
          * @throws Exception 构建过滤链过程中可能抛出的异常。
          */
         @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
                 http
                                 .csrf(AbstractHttpConfigurer::disable)
                                 .cors(Customizer.withDefaults())
@@ -61,7 +65,15 @@ public class SecurityConfig {
                                                                 "/api/v1/auth/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
-                                .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
+                                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> 
+                                        jwt.decoder(token -> {
+                                            Jwt decodedJwt = jwtDecoder.decode(token);
+                                            if (!"access".equals(decodedJwt.getClaimAsString("token_type"))) {
+                                                throw new JwtException("无效的令牌类型，必须是 access token");
+                                            }
+                                            return decodedJwt;
+                                        })
+                                ));
                 return http.build();
         }
 
