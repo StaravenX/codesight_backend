@@ -1,34 +1,30 @@
-package com.codesight.auth.api.dto;
-
-import java.time.LocalDate;
+package com.codesight.user.api.dto;
 
 import com.codesight.user.User;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/**
- * 认证用户响应。
- * <p>
- * 面向客户端展示的基础用户信息，供“我是谁”与首页显示使用。
- */
-@Schema(description = "认证用户响应")
-public record AuthUserResponse(
-        @Schema(description = "用户 ID") Long id,
-        @Schema(description = "平台唯一ID (csId)") String csId,
+import java.time.Instant;
+import java.time.LocalDate;
+
+@Schema(description = "用户个人资料响应")
+public record UserProfileResponse(
+        @Schema(description = "用户ID") long id,
+        @Schema(description = "极客号") String csId,
         @Schema(description = "昵称") String nickname,
         @Schema(description = "头像") String avatar,
         @Schema(description = "手机号") String phone,
-        @Schema(description = "邮箱地址") String email,
+        @Schema(description = "邮箱") String email,
         @Schema(description = "个人简介") String bio,
         @Schema(description = "性别") String gender,
         @Schema(description = "出生日期") LocalDate birthday,
         @Schema(description = "就职公司") String company,
         @Schema(description = "职位") String jobTitle,
         @Schema(description = "院校") String school,
-        @Schema(description = "感兴趣的技术领域") String interestedDomains
+        @Schema(description = "感兴趣的技术领域") String interestedDomains,
+        @Schema(description = "账号创建时间") Instant createdTime
 ) {
-    public AuthUserResponse(User user) {
-        this(
+    public static UserProfileResponse from(User user) {
+        return new UserProfileResponse(
                 user.getId(),
                 user.getCsId(),
                 user.getNickname(),
@@ -41,7 +37,8 @@ public record AuthUserResponse(
                 user.getCompany(),
                 user.getJobTitle(),
                 user.getSchool(),
-                user.getInterestedDomains()
+                user.getInterestedDomains(),
+                user.getCreatedTime()
         );
     }
 }
