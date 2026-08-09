@@ -20,6 +20,7 @@ import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
 import com.codesight.user.User;
 import com.codesight.user.UserService;
+import com.codesight.user.api.dto.UserProfileResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,10 +56,10 @@ public class AuthService {
         boolean exists = findByIdentifier(type, identifier).isPresent();
 
         if (scene == VerificationScene.REGISTER && exists) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "该账号已存在");
+            throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS, "该账号已存在");
         }
         if ((scene == VerificationScene.LOGIN || scene == VerificationScene.RESET_PASSWORD) && !exists) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "账号不存在，请先注册");
+            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "账号不存在，请先注册");
         }
 
         SendCodeResult result = verificationService.sendCode(scene, identifier, type);
@@ -122,7 +123,7 @@ public class AuthService {
         loginLogService.save(user.getId(), identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(),
                 LoginStatus.SUCCESS);
 
-        return new AuthResponse(new AuthUserResponse(user), new TokenResponse(tokenPair));
+        return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
     }
 
     /**
@@ -150,7 +151,7 @@ public class AuthService {
         loginLogService.save(user.getId(), identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(),
                 LoginStatus.SUCCESS);
                 
-        return new AuthResponse(new AuthUserResponse(user), new TokenResponse(tokenPair));
+        return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
     }
 
     /**
@@ -175,7 +176,7 @@ public class AuthService {
         loginLogService.save(user.getId(), identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(),
                 LoginStatus.SUCCESS);
 
-        return new AuthResponse(new AuthUserResponse(user), new TokenResponse(tokenPair));
+        return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
     }
 
     private void validateIdentifier(IdentifierType type, String identifier) {

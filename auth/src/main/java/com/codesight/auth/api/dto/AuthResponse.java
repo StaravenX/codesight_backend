@@ -2,6 +2,8 @@ package com.codesight.auth.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import com.codesight.user.api.dto.UserProfileResponse;
+
 /**
  * 认证响应。
  * <p>
@@ -9,7 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @Schema(description = "认证响应")
 public record AuthResponse(
-        @Schema(description = "用户信息") AuthUserResponse user,
+        @Schema(description = "用户信息") UserProfileResponse user,
         @Schema(description = "令牌信息") TokenResponse token
 ) {
 }
