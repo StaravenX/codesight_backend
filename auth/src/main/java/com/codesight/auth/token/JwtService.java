@@ -68,6 +68,15 @@ public class JwtService {
         refreshTokenStore.revokeAll(userId);
     }
 
+    /**
+     * 撤销指定用户的指定 Refresh Token。
+     *
+     * @param userId         用户 ID。
+     * @param tokenId        Refresh Token 的 ID (jti)。
+     */
+    public void revoke(long userId, String tokenId) {
+        refreshTokenStore.revokeToken(userId, tokenId);
+    }
 
     /**
      * 解码 JWT 字符串为 {@link Jwt}。
@@ -125,6 +134,17 @@ public class JwtService {
     public String extractTokenType(Jwt jwt) {
         Object claim = jwt.getClaims().get(CLAIM_TOKEN_TYPE);
         return claim != null ? claim.toString() : "";
+    }
+
+    /**
+     * 检查 JWT 是否有效。
+     *
+     * @param userId 用户 ID。
+     * @param tokenId 令牌 ID。
+     * @return 如果令牌有效则返回 true，否则返回 false。
+     */
+    public boolean isTokenValid(Long userId, String tokenId) {
+        return refreshTokenStore.isTokenValid(userId, tokenId);
     }
 
 }
