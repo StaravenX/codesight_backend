@@ -3,6 +3,7 @@ package com.codesight.common.web;
 import com.codesight.common.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -40,6 +41,15 @@ public class GlobalExceptionHandler {
         // 获取所有校验报错中的第一个报错信息
         String errorMsg = e.getBindingResult().getAllErrors().getFirst().getDefaultMessage();
         return ResponseEntity.badRequest().body(Result.error("BAD_REQUEST", errorMsg));
+    }
+
+    /**
+     * 拦截数据库唯一索引冲突异常 (DuplicateKeyException)。
+     * <p>
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<Result<Void>> handleDuplicateKeyException(DuplicateKeyException e) {
+        return ResponseEntity.badRequest().body(Result.error("BAD_REQUEST", e.getCause().getMessage()));
     }
 
     /**
