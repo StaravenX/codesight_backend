@@ -11,6 +11,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 认证 API 控制器。
+ * <p>
+ * 暴露 REST 接口：发送验证码、注册、验证码登录、密码登录，刷新令牌、登出、重置密码
+ */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("api/v1/auth")
@@ -110,5 +115,21 @@ public class AuthController {
     @Operation(summary = "刷新令牌", description = "使用 Refresh Token 刷新令牌")
     public TokenResponse refresh(@Valid @RequestBody TokenRefreshRequest request, ClientInfo clientInfo) {
         return authService.refresh(request, clientInfo);
+    }
+
+    /**
+     * 使用验证码重置密码。
+     * <p>
+     * 验证标识与验证码后更新用户密码哈希，并撤销该用户所有刷新令牌以强制下线。
+     *
+     * @param request    请求体，包含：标识类型与值、验证码、新密码。
+     * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
+     * @return 空响应，HTTP 204 No Content。
+     */
+    @PostMapping("/password/reset")
+    @Operation(summary = "重置密码", description = "使用验证码重置密码")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request, ClientInfo clientInfo) {
+        authService.resetPassword(request, clientInfo);
+        return ResponseEntity.noContent().build();
     }
 }
