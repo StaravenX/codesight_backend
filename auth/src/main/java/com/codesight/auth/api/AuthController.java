@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -81,5 +82,33 @@ public class AuthController {
         return authService.loginByCode(request, clientInfo);
     }
 
+    /**
+     * 登出并撤销刷新令牌。
+     * <p>
+     * 若提供的令牌为合法的 Refresh Token，则撤销其白名单记录；返回 204，无响应体。
+     *
+     * @param request 请求体，包含：refreshToken（欲撤销的刷新令牌）。
+     * @return 空响应，HTTP 204 No Content。
+     */
+    @PostMapping("/logout")
+    @Operation(summary = "登出", description = "登出并撤销刷新令牌")
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ResponseEntity.noContent().build();
+    }
 
+    /**
+     * 使用 Refresh Token 刷新令牌。
+     * <p>
+     * 校验刷新令牌的合法性与白名单状态，签发新的令牌对，并撤销旧刷新令牌。
+     *
+     * @param request    请求体，包含：refreshToken（刷新令牌）。
+     * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
+     * @return 新的令牌响应（accessToken/refreshToken 及其过期时间）。
+     */
+    @PostMapping("/token/refresh")
+    @Operation(summary = "刷新令牌", description = "使用 Refresh Token 刷新令牌")
+    public TokenResponse refresh(@Valid @RequestBody TokenRefreshRequest request, ClientInfo clientInfo) {
+        return authService.refresh(request, clientInfo);
+    }
 }

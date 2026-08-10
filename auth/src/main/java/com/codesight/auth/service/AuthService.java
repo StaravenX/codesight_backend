@@ -24,6 +24,7 @@ import com.codesight.user.api.dto.UserProfileResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -77,53 +78,58 @@ public class AuthService {
      * @throws BusinessException 当未同意协议、标识冲突、验证码失败、密码不合规时抛出。
      */
     public AuthResponse register(RegisterRequest request, ClientInfo clientInfo) {
+        String identifier = request.identifier();
+        try {
+            // 1. 校验是否同意协议
+            if (!request.agreeTerms()) {
+                throw new BusinessException(ErrorCode.TERMS_NOT_ACCEPTED);
+            }
 
-        // 1. 校验是否同意协议
-        if (!request.agreeTerms()) {
-            throw new BusinessException(ErrorCode.TERMS_NOT_ACCEPTED);
+            // 2. 校验标识合法性
+            validateIdentifier(request.identifierType(), request.identifier());
+
+            // 3. 标准化清洗账号标识
+            identifier = normalizeIdentifier(request.identifierType(), request.identifier());
+
+            // 4. 校验标识是否已存在
+            if (findByIdentifier(request.identifierType(), identifier).isPresent()) {
+                throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS);
+            }
+
+            // 5. 校验密码并加密（可选）
+            String passwordHash = null;
+            if (StringUtils.hasText(request.password())) {
+                validatePassword(request.password());
+                passwordHash = passwordEncoder.encode(request.password().trim());
+            }
+
+            // 6. 校验验证码是否正确
+            verificationService.ensureVerified(VerificationScene.REGISTER, identifier, request.code());
+
+            // 7. 构造用户信息
+            User user = User.builder()
+                    .phone(request.identifierType() == IdentifierType.PHONE ? identifier : null)
+                    .email(request.identifierType() == IdentifierType.EMAIL ? identifier : null)
+                    .passwordHash(passwordHash)
+                    .nickname(StringUtils.hasText(request.nickname()) ? request.nickname() : "User_" + RandomUtil.randomString(8).toUpperCase())
+                    .csId("geek_" + RandomUtil.randomString(8).toLowerCase())
+                    .avatar("default-avatar.png")
+                    .interestedDomains("[]")
+                    .build();
+
+
+            userService.save(user);
+
+            // 8. 签发令牌并记录日志
+            TokenPair tokenPair = jwtService.issueTokenPair(user);
+            loginLogService.save(user.getId(), identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(),
+                    LoginStatus.SUCCESS);
+
+            return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+        } catch (BusinessException e) {
+            loginLogService.save(null, identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            throw e;
         }
-
-        // 2. 校验标识合法性
-        validateIdentifier(request.identifierType(), request.identifier());
-
-        // 3. 标准化清洗账号标识
-        String identifier = normalizeIdentifier(request.identifierType(), request.identifier());
-
-        // 4. 校验标识是否已存在
-        if (findByIdentifier(request.identifierType(), identifier).isPresent()) {
-            throw new BusinessException(ErrorCode.IDENTIFIER_EXISTS);
-        }
-
-        // 5. 校验密码并加密（可选）
-        String passwordHash = null;
-        if (StringUtils.hasText(request.password())) {
-            validatePassword(request.password());
-            passwordHash = passwordEncoder.encode(request.password().trim());
-        }
-
-        // 6. 校验验证码是否正确
-        verificationService.ensureVerified(VerificationScene.REGISTER, identifier, request.code());
-
-        // 7. 构造用户信息
-        User user = User.builder()
-                .phone(request.identifierType() == IdentifierType.PHONE ? identifier : null)
-                .email(request.identifierType() == IdentifierType.EMAIL ? identifier : null)
-                .passwordHash(passwordHash)
-                .nickname(StringUtils.hasText(request.nickname()) ? request.nickname() : "User_" + RandomUtil.randomString(8).toUpperCase())
-                .csId("geek_" + RandomUtil.randomString(8).toLowerCase())
-                .avatar("default-avatar.png")
-                .interestedDomains("[]")
-                .build();
-
-
-        userService.save(user);
-
-        // 8. 签发令牌并记录日志
-        TokenPair tokenPair = jwtService.issueTokenPair(user);
-        loginLogService.save(user.getId(), identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(),
-                LoginStatus.SUCCESS);
-
-        return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
     }
 
     /**
@@ -136,12 +142,14 @@ public class AuthService {
         String identifier = request.identifier();
         String password = request.password();
         IdentifierType type = request.type();
+        User user = null;
 
-        normalizeIdentifier(type, identifier);
-        validateIdentifier(type, identifier);
-
-        User user = findByIdentifier(type, identifier)
-                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
+        try {
+            normalizeIdentifier(type, identifier);
+            validateIdentifier(type, identifier);
+    
+            user = findByIdentifier(type, identifier)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "密码错误");
@@ -152,6 +160,11 @@ public class AuthService {
                 LoginStatus.SUCCESS);
                 
         return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+        } catch (BusinessException e) {
+            Long userId = user != null ? user.getId() : null;
+            loginLogService.save(userId, identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            throw e;
+        }
     }
 
     /**
@@ -163,22 +176,81 @@ public class AuthService {
     public AuthResponse loginByCode(@Valid LoginByCodeRequest request, ClientInfo clientInfo) {
         String identifier = request.identifier();
         IdentifierType type = request.type();
+        User user = null;
 
-        normalizeIdentifier(type, identifier);
-        validateIdentifier(type, identifier);
+        try {
+            normalizeIdentifier(type, identifier);
+            validateIdentifier(type, identifier);
+    
+            user = findByIdentifier(type, identifier)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
 
-        User user = findByIdentifier(type, identifier)
-                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
+            verificationService.ensureVerified(VerificationScene.LOGIN, identifier, request.code());
 
-        verificationService.ensureVerified(VerificationScene.LOGIN, identifier, request.code());
+            TokenPair tokenPair = jwtService.issueTokenPair(user);
+            loginLogService.save(user.getId(), identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(),
+                    LoginStatus.SUCCESS);
 
-        TokenPair tokenPair = jwtService.issueTokenPair(user);
-        loginLogService.save(user.getId(), identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(),
-                LoginStatus.SUCCESS);
-
-        return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+            return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+        } catch (BusinessException e) {
+            Long userId = user != null ? user.getId() : null;
+            loginLogService.save(userId, identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            throw e;
+        }
     }
 
+    /**
+     * 退出登录
+     * 
+     * @param request 刷新令牌请求
+     */
+    public void logout(LogoutRequest request) {
+        String refreshToken = request.refreshToken();
+        Jwt jwt = jwtService.decode(refreshToken);
+
+        if (jwtService.extractTokenType(jwt).equals("access")) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请使用 Refresh Token 进行登出");
+        }
+
+        long userId = jwtService.extractUserId(jwt);
+        jwtService.revoke(userId, jwt.getId());
+    }
+
+    public TokenResponse refresh(@Valid TokenRefreshRequest request, ClientInfo clientInfo) {
+        String refreshToken = request.refreshToken();
+        Jwt jwt = jwtService.decode(refreshToken);
+
+        if (jwtService.extractTokenType(jwt).equals("access")) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请使用 Refresh Token 进行刷新");
+        }
+
+        long userId = jwtService.extractUserId(jwt);
+        String tokenId = jwt.getId();
+
+        if(!jwtService.isTokenValid(userId, tokenId)) {
+            loginLogService.save(userId, "System", LoginChannel.TOKEN_REFRESH, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            
+            jwtService.revokeAll(userId);
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌无效或已被撤销");
+        }
+
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在或已被删除");
+        }
+
+        TokenPair newTokenPair = jwtService.issueTokenPair(user);
+        jwtService.revoke(userId, tokenId);
+
+        return new TokenResponse(newTokenPair);
+    }
+
+    /**
+     * 验证标识是否合法
+     * 
+     * @param type       标识类型
+     * @param identifier 标识值
+     */
     private void validateIdentifier(IdentifierType type, String identifier) {
         // 标示合法性判断
         if(type == IdentifierType.EMAIL && !Validator.isEmail(identifier)) {
