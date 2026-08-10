@@ -202,7 +202,7 @@ public class AuthService {
     /**
      * 退出登录
      * 
-     * @param request 刷新令牌请求
+     * @param request 退出登录请求
      */
     public void logout(LogoutRequest request) {
         String refreshToken = request.refreshToken();
@@ -216,6 +216,12 @@ public class AuthService {
         jwtService.revoke(userId, jwt.getId());
     }
 
+    /**
+     * 刷新 Refresh Token
+     * @param request 刷新令牌请求
+     * @param clientInfo 客户端信息
+     * @return 新的令牌响应
+     */
     public TokenResponse refresh(@Valid TokenRefreshRequest request, ClientInfo clientInfo) {
         String refreshToken = request.refreshToken();
         Jwt jwt = jwtService.decode(refreshToken);
@@ -243,6 +249,46 @@ public class AuthService {
         jwtService.revoke(userId, tokenId);
 
         return new TokenResponse(newTokenPair);
+    }
+
+    /**
+     * 重置密码
+     * @param request 重置密码请求
+     */
+    public void resetPassword(@Valid PasswordResetRequest request, ClientInfo clientInfo) {
+        String code = request.code();
+        String newPassword = request.newPassword();
+        String identifier = request.identifier();
+        IdentifierType type = request.identifierType();
+        User user = null;
+
+        try {
+            identifier = normalizeIdentifier(type, identifier);
+            validateIdentifier(type, identifier);
+            validatePassword(newPassword);
+
+            user = findByIdentifier(type, identifier).orElse(null);
+            if (user == null) {
+                throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在");
+            }
+
+            if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+                throw new BusinessException(ErrorCode.PASSWORD_POLICY_VIOLATION, "新密码不能与原密码相同");
+            }
+
+            verificationService.ensureVerified(VerificationScene.RESET_PASSWORD, identifier, code);
+
+            String newPasswordHash = passwordEncoder.encode(newPassword.trim());
+            user.setPasswordHash(newPasswordHash);
+            userService.updateById(user);
+
+            jwtService.revokeAll(user.getId());
+            loginLogService.save(user.getId(), identifier, LoginChannel.PASSWORD_RESET, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.SUCCESS);
+        } catch (BusinessException e) {
+            Long userId = user != null ? user.getId() : null;
+            loginLogService.save(userId, identifier, LoginChannel.PASSWORD_RESET, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            throw e;
+        }
     }
 
     /**
