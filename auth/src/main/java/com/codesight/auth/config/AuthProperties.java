@@ -25,6 +25,8 @@ public class AuthProperties {
     private final Verification verification = new Verification();
     /** 密码策略配置项。 */
     private final Password password = new Password();
+    /** 登录配置项 */
+    private final Login login = new Login();
 
     @Data
     public static class Jwt {
@@ -67,4 +69,18 @@ public class AuthProperties {
         /** 密码最小长度。 */
         private int minLength;
     }
+
+    /** 登录配置。 */
+    @Data
+    public static class Login {
+        /** 同一IP最大尝试次数 */
+        private int maxIpAttempts;
+        /** 同一IP达到最大尝试次数后的封禁时间 */
+        private Duration ipLockTime;
+        /** 同一账户最大尝试次数 */
+        private int maxAccountAttempts;
+        /** 同一账户达到最大尝试次数后的封禁时间。*/
+        private Duration accountLockTime;
+    }
+
 }
