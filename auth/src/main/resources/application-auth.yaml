@@ -19,3 +19,8 @@ auth:
   password:
     bcrypt-strength: 12
     min-length: 8
+  login:
+    max-ip-attempts: 20
+    max-account-attempts: 20
+    account-lock-time: PT15M
+    ip-lock-time: PT30M

@@ -17,6 +17,7 @@ public enum ErrorCode {
     PASSWORD_POLICY_VIOLATION("PASSWORD_POLICY_VIOLATION", "密码不符合规则", 400),
     IDENTIFIER_NOT_FOUND("IDENTIFIER_NOT_FOUND", "标识不存在", 404),
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", "无效的凭证", 401),
+    LOGIN_LOCKED("LOGIN_LOCKED", "登录失败次数过多，账号已被临时锁定", 423),
     UNAUTHORIZED("UNAUTHORIZED", "登录已失效，请重新登录", 401);
 
     final String code;

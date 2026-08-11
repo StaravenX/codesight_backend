@@ -38,6 +38,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthProperties authProperties;
     private final LoginLogService loginLogService;
+    private final LoginSecurityService loginSecurityService;
 
     /**
      * 发送验证码并返回过期信息。
@@ -145,24 +146,27 @@ public class AuthService {
         User user = null;
 
         try {
-            normalizeIdentifier(type, identifier);
+            loginSecurityService.checkIsLocked(identifier, clientInfo.ip());
+            identifier = normalizeIdentifier(type, identifier);
             validateIdentifier(type, identifier);
     
             user = findByIdentifier(type, identifier)
                     .orElseThrow(() -> new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在"));
 
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "密码错误");
-        }
+            if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+                throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "密码错误");
+            }
 
-        TokenPair tokenPair = jwtService.issueTokenPair(user);
-        loginLogService.save(user.getId(), identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(),
-                LoginStatus.SUCCESS);
-                
-        return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+            TokenPair tokenPair = jwtService.issueTokenPair(user);
+            loginLogService.save(user.getId(), identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(),
+                    LoginStatus.SUCCESS);
+
+            loginSecurityService.clearFailure(identifier, clientInfo.ip());
+            return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
         } catch (BusinessException e) {
             Long userId = user != null ? user.getId() : null;
             loginLogService.save(userId, identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            loginSecurityService.recordFailure(identifier, clientInfo.ip());
             throw e;
         }
     }
@@ -179,7 +183,8 @@ public class AuthService {
         User user = null;
 
         try {
-            normalizeIdentifier(type, identifier);
+            loginSecurityService.checkIsLocked(identifier, clientInfo.ip());
+            identifier = normalizeIdentifier(type, identifier);
             validateIdentifier(type, identifier);
     
             user = findByIdentifier(type, identifier)
@@ -191,10 +196,12 @@ public class AuthService {
             loginLogService.save(user.getId(), identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(),
                     LoginStatus.SUCCESS);
 
+            loginSecurityService.clearFailure(identifier, clientInfo.ip());
             return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
         } catch (BusinessException e) {
             Long userId = user != null ? user.getId() : null;
             loginLogService.save(userId, identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
+            loginSecurityService.recordFailure(identifier, clientInfo.ip());
             throw e;
         }
     }
