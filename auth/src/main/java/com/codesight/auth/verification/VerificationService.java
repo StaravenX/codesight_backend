@@ -73,7 +73,7 @@ public class VerificationService {
         Assert.notNull(scene, "scene must not be null");
         Assert.hasText(identifier, "identifier must not be empty");
         Assert.hasText(code, "code must not be empty");
-        codeStore.ensureVerified(scene.name(), identifier, code);
+        codeStore.ensureVerified(scene.name(), identifier, code, properties.getVerification().getLockTime());
     }
 
     /**
