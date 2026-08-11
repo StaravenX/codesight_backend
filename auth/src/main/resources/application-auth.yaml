@@ -15,6 +15,7 @@ auth:
     max-attempts: 5
     send-interval: PT60S
     daily-limit: 10
+    lock-time: PT30M
   password:
     bcrypt-strength: 12
     min-length: 8
