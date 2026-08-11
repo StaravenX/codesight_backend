@@ -56,6 +56,7 @@ class VerificationServiceTest {
         mockConfig.setCodeLength(6);
         mockConfig.setTtl(Duration.ofMinutes(5));
         mockConfig.setMaxAttempts(5);
+        mockConfig.setLockTime(Duration.ofMinutes(30));
 
         lenient().when(properties.getVerification()).thenReturn(mockConfig);
     }
@@ -118,12 +119,12 @@ class VerificationServiceTest {
 
     @Test
     void testEnsureVerified_Success() {
-        doNothing().when(codeStore).ensureVerified("LOGIN", "test@example.com", "123456");
+        doNothing().when(codeStore).ensureVerified("LOGIN", "test@example.com", "123456", mockConfig.getLockTime());
 
         assertDoesNotThrow(() ->
                 verificationService.ensureVerified(VerificationScene.LOGIN, "test@example.com", "123456")
         );
 
-        verify(codeStore, times(1)).ensureVerified("LOGIN", "test@example.com", "123456");
+        verify(codeStore, times(1)).ensureVerified("LOGIN", "test@example.com", "123456", mockConfig.getLockTime());
     }
 }

@@ -27,8 +27,9 @@ public interface VerificationCodeStore {
      * @param scene      场景名称。
      * @param identifier 标识（手机号或邮箱）。
      * @param code       用户输入的验证码。
+     * @param lockTime    达到最大尝试后的限制时间。
      */
-    void ensureVerified(String scene, String identifier, String code);
+    void ensureVerified(String scene, String identifier, String code, Duration lockTime);
 
 }
 
