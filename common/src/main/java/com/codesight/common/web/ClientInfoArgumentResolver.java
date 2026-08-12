@@ -1,6 +1,6 @@
-package com.codesight.auth.config;
+package com.codesight.common.web;
 
-import com.codesight.auth.model.ClientInfo;
+import com.codesight.common.model.ClientInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;

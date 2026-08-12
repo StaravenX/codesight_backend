@@ -18,6 +18,7 @@ public enum ErrorCode {
     IDENTIFIER_NOT_FOUND("IDENTIFIER_NOT_FOUND", "标识不存在", 404),
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", "无效的凭证", 401),
     LOGIN_LOCKED("LOGIN_LOCKED", "登录失败次数过多，账号已被临时锁定", 423),
+    TOO_MANY_REQUESTS("TOO_MANY_REQUESTS", "请求过于频繁，请稍后再试", 429),
     UNAUTHORIZED("UNAUTHORIZED", "登录已失效，请重新登录", 401);
 
     final String code;
