@@ -15,6 +15,12 @@ auth:
     max-attempts: 5
     send-interval: PT60S
     daily-limit: 10
+    lock-time: PT30M
   password:
     bcrypt-strength: 12
     min-length: 8
+  login:
+    max-ip-attempts: 20
+    max-account-attempts: 20
+    account-lock-time: PT15M
+    ip-lock-time: PT30M

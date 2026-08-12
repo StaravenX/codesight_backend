@@ -32,7 +32,7 @@ public class VerificationService {
 
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    private final VerificationCodeStore codeManager;
+    private final VerificationCodeStore codeStore;
     private final CodeSender codeSender;
     private final StringRedisTemplate stringRedisTemplate;
     private final AuthProperties properties;
@@ -57,7 +57,7 @@ public class VerificationService {
         enforceDailyLimit(scene, identifier, cfg.getDailyLimit());
 
         String code = RandomUtil.randomNumbers(cfg.getCodeLength());
-        codeManager.saveCode(scene.name(), identifier, code, cfg.getTtl(), cfg.getMaxAttempts());
+        codeStore.saveCode(scene.name(), identifier, code, cfg.getTtl(), cfg.getMaxAttempts());
         codeSender.sendCode(scene.name(), type, identifier, code, (int) cfg.getTtl().toMinutes());
         return new SendCodeResult(identifier, scene, (int) cfg.getTtl().toSeconds());
     }
@@ -68,14 +68,12 @@ public class VerificationService {
      * @param scene      验证码场景。
      * @param identifier 标识（手机号或邮箱）。
      * @param code       用户输入的验证码。
-     * @return 校验结果，包含状态与尝试次数统计。
-     * @throws BusinessException 参数不完整时抛出。
      */
-    public VerificationCheckResult verifyCode(VerificationScene scene, String identifier, String code) {
+    public void ensureVerified(VerificationScene scene, String identifier, String code) {
         Assert.notNull(scene, "scene must not be null");
         Assert.hasText(identifier, "identifier must not be empty");
         Assert.hasText(code, "code must not be empty");
-        return codeManager.verifyCode(scene.name(), identifier, code);
+        codeStore.ensureVerified(scene.name(), identifier, code, properties.getVerification().getLockTime());
     }
 
     /**

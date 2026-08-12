@@ -1,6 +1,5 @@
 package com.codesight.auth.verification;
 
-import com.codesight.auth.verification.model.*;
 import java.time.Duration;
 
 /**
@@ -28,9 +27,9 @@ public interface VerificationCodeStore {
      * @param scene      场景名称。
      * @param identifier 标识（手机号或邮箱）。
      * @param code       用户输入的验证码。
-     * @return 校验结果，包含状态与尝试次数统计。
+     * @param lockTime    达到最大尝试后的限制时间。
      */
-    VerificationCheckResult verifyCode(String scene, String identifier, String code);
+    void ensureVerified(String scene, String identifier, String code, Duration lockTime);
 
 }
 

@@ -1,7 +1,5 @@
 package com.codesight.auth.verification;
 
-import com.codesight.auth.verification.model.*;
-
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.HashOperations;
@@ -9,8 +7,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.Objects;
+import java.util.Collections;
+
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
@@ -27,10 +27,14 @@ public class RedisVerificationCodeStore implements VerificationCodeStore {
     private static final String FIELD_MAX_ATTEMPTS = "maxAttempts";
     private static final String FIELD_ATTEMPTS = "attempts";
 
+    private final DefaultRedisScript<Long> verifyScript;
     private final StringRedisTemplate redisTemplate;
 
     public RedisVerificationCodeStore(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
+        this.verifyScript = new DefaultRedisScript<>();
+        this.verifyScript.setLocation(new ClassPathResource("lua/verify_code.lua"));
+        this.verifyScript.setResultType(Long.class);
     }
 
     /**
@@ -71,41 +75,30 @@ public class RedisVerificationCodeStore implements VerificationCodeStore {
     }
 
     /**
-     * 校验验证码是否匹配，更新尝试计数并在成功时删除记录。
+     * 校验验证码是否匹配，更新尝试计数并在成功时删除记录，失败则抛出异常
      *
      * @param scene      场景名称。
      * @param identifier 标识（手机号或邮箱）。
      * @param code       用户输入的验证码。
-     * @return 校验结果（成功、未找到、错误、尝试过多）。
      */
     @Override
-    public VerificationCheckResult verifyCode(String scene, String identifier, String code) {
+    public void ensureVerified(String scene, String identifier, String code, Duration lockTime) {
         String key = buildKey(scene, identifier);
-        HashOperations<String, String, String> ops = redisTemplate.opsForHash();
-        Map<String, String> data = ops.entries(key);
-        if (data.isEmpty()) {
-            return new VerificationCheckResult(VerificationCodeStatus.NOT_FOUND, 0, 0);
-        }
-        String storedCode = data.get(FIELD_CODE);
-        int maxAttempts = parseInt(data.get(FIELD_MAX_ATTEMPTS), 5);
-        int attempts = parseInt(data.get(FIELD_ATTEMPTS), 0);
+        
+        long result = redisTemplate.execute(
+                verifyScript,
+                Collections.singletonList(key),
+                code,
+                String.valueOf(Duration.ofMinutes(30).toSeconds())
+        );
 
-        if (attempts >= maxAttempts) {
-            return new VerificationCheckResult(VerificationCodeStatus.TOO_MANY_ATTEMPTS, attempts, maxAttempts);
+        if (result == 0L) {
+            throw new BusinessException(ErrorCode.VERIFICATION_MISMATCH);
+        } else if (result == -1L) {
+            throw new BusinessException(ErrorCode.VERIFICATION_NOT_FOUND);
+        } else if (result == -2L) {
+            throw new BusinessException(ErrorCode.VERIFICATION_TOO_MANY_ATTEMPTS);
         }
-
-        if (Objects.equals(storedCode, code)) {
-            redisTemplate.delete(key);
-            return new VerificationCheckResult(VerificationCodeStatus.SUCCESS, attempts, maxAttempts);
-        }
-
-        int updatedAttempts = attempts + 1;
-        ops.put(key, FIELD_ATTEMPTS, String.valueOf(updatedAttempts));
-        if (updatedAttempts >= maxAttempts) {
-            redisTemplate.expire(key, Duration.ofMinutes(30));
-            return new VerificationCheckResult(VerificationCodeStatus.TOO_MANY_ATTEMPTS, updatedAttempts, maxAttempts);
-        }
-        return new VerificationCheckResult(VerificationCodeStatus.MISMATCH, updatedAttempts, maxAttempts);
     }
 
     /**
@@ -119,22 +112,5 @@ public class RedisVerificationCodeStore implements VerificationCodeStore {
         return "auth:code:%s:%s".formatted(scene, identifier);
     }
 
-    /**
-     * 解析整数字符串，失败返回默认值。
-     *
-     * @param value        待解析字符串。
-     * @param defaultValue 解析失败时的默认值。
-     * @return 整数值。
-     */
-    private static int parseInt(String value, int defaultValue) {
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ex) {
-            return defaultValue;
-        }
-    }
 }
 

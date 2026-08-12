@@ -3,8 +3,6 @@ package com.codesight.auth.verification;
 import com.codesight.auth.config.AuthProperties;
 import com.codesight.auth.model.IdentifierType;
 import com.codesight.auth.verification.model.SendCodeResult;
-import com.codesight.auth.verification.model.VerificationCheckResult;
-import com.codesight.auth.verification.model.VerificationCodeStatus;
 import com.codesight.auth.verification.model.VerificationScene;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
@@ -58,16 +56,17 @@ class VerificationServiceTest {
         mockConfig.setCodeLength(6);
         mockConfig.setTtl(Duration.ofMinutes(5));
         mockConfig.setMaxAttempts(5);
-        
+        mockConfig.setLockTime(Duration.ofMinutes(30));
+
         lenient().when(properties.getVerification()).thenReturn(mockConfig);
     }
 
     @Test
     void testSendCode_Success() {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        
-        // 模拟未在冷却期内
-        when(valueOperations.get(anyString())).thenReturn(null);
+
+        // 模拟未在冷却期内 (setIfAbsent 成功返回 true)
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         // 模拟当日第一次发送
         when(valueOperations.increment(anyString())).thenReturn(1L);
 
@@ -86,15 +85,15 @@ class VerificationServiceTest {
     @Test
     void testSendCode_RateLimitExceeded() {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        
-        // 模拟仍在冷却期内
-        when(valueOperations.get(anyString())).thenReturn("1");
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> 
-            verificationService.sendCode(VerificationScene.LOGIN, "test@example.com", IdentifierType.EMAIL));
-        
+        // 模拟仍在冷却期内 (setIfAbsent 失败返回 false)
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                verificationService.sendCode(VerificationScene.LOGIN, "test@example.com", IdentifierType.EMAIL));
+
         assertEquals(ErrorCode.VERIFICATION_RATE_LIMIT, ex.getErrorCode());
-        
+
         // 确保没有调用后续的存储和发送逻辑
         verify(codeStore, never()).saveCode(anyString(), anyString(), anyString(), any(Duration.class), anyInt());
         verify(codeSender, never()).sendCode(anyString(), any(IdentifierType.class), anyString(), anyString(), anyInt());
@@ -103,29 +102,29 @@ class VerificationServiceTest {
     @Test
     void testSendCode_DailyLimitExceeded() {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        
+
         // 模拟不在冷却期
-        when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         // 触发每日上限
         when(valueOperations.increment(anyString())).thenReturn(6L);
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> 
-            verificationService.sendCode(VerificationScene.LOGIN, "test@example.com", IdentifierType.EMAIL));
-        
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                verificationService.sendCode(VerificationScene.LOGIN, "test@example.com", IdentifierType.EMAIL));
+
         assertEquals(ErrorCode.VERIFICATION_DAILY_LIMIT, ex.getErrorCode());
-        
+
         // 确保没有调用后续的存储和发送逻辑
         verify(codeStore, never()).saveCode(anyString(), anyString(), anyString(), any(Duration.class), anyInt());
     }
 
     @Test
-    void testVerify_Success() {
-        VerificationCheckResult mockResult = new VerificationCheckResult(VerificationCodeStatus.SUCCESS, 1, 5);
-        when(codeStore.verifyCode("LOGIN", "test@example.com", "123456")).thenReturn(mockResult);
+    void testEnsureVerified_Success() {
+        doNothing().when(codeStore).ensureVerified("LOGIN", "test@example.com", "123456", mockConfig.getLockTime());
 
-        VerificationCheckResult result = verificationService.verifyCode(VerificationScene.LOGIN, "test@example.com", "123456");
+        assertDoesNotThrow(() ->
+                verificationService.ensureVerified(VerificationScene.LOGIN, "test@example.com", "123456")
+        );
 
-        assertNotNull(result);
-        assertEquals(VerificationCodeStatus.SUCCESS, result.status());
+        verify(codeStore, times(1)).ensureVerified("LOGIN", "test@example.com", "123456", mockConfig.getLockTime());
     }
 }

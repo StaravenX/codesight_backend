@@ -1,4 +1,4 @@
-package com.codesight.auth.model;
+package com.codesight.common.model;
 
 /**
  * 客户端信息。
