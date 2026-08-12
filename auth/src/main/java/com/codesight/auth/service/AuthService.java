@@ -9,7 +9,7 @@ import com.codesight.auth.audit.LoginLogService;
 import com.codesight.auth.audit.model.LoginChannel;
 import com.codesight.auth.audit.model.LoginStatus;
 import com.codesight.auth.config.AuthProperties;
-import com.codesight.auth.model.ClientInfo;
+import com.codesight.common.model.ClientInfo;
 import com.codesight.auth.model.IdentifierType;
 import com.codesight.auth.token.JwtService;
 import com.codesight.auth.token.TokenPair;

@@ -1,7 +1,8 @@
 package com.codesight.auth.api;
 
 import com.codesight.auth.api.dto.*;
-import com.codesight.auth.model.ClientInfo;
+import com.codesight.common.annotation.RateLimit;
+import com.codesight.common.model.ClientInfo;
 import com.codesight.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +37,7 @@ public class AuthController {
      *                - scene：验证码使用场景（REGISTER/LOGIN/RESET_PASSWORD）。
      * @return 响应体，包含目标标识、场景以及验证码过期秒数。
      */
+    @RateLimit
     @PostMapping("/send-code")
     @Operation(summary = "发送验证码", description = "根据场景向手机号或邮箱发送一次性验证码")
     public SendCodeResponse sendCode(@Valid @RequestBody SendCodeRequest request) {
@@ -51,6 +53,7 @@ public class AuthController {
      * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
      * @return 认证响应，包含用户信息与令牌对。
      */
+    @RateLimit
     @PostMapping("/register")
     @Operation(summary = "注册新用户", description = "验证标识与验证码后创建用户，并签发token")
     public AuthResponse register(@Valid @RequestBody RegisterRequest request, ClientInfo clientInfo) {
@@ -66,6 +69,7 @@ public class AuthController {
      * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
      * @return 认证响应，包含用户信息与令牌对。
      */
+    @RateLimit
     @PostMapping("/login/password")
     @Operation(summary = "密码登录", description = "使用手机号/邮箱和密码登录")
     public AuthResponse loginByPassword(@Valid @RequestBody LoginByPasswordRequest request, ClientInfo clientInfo) {
@@ -81,6 +85,7 @@ public class AuthController {
      * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
      * @return 认证响应，包含用户信息与令牌对。
      */
+    @RateLimit
     @PostMapping("/login/code")
     @Operation(summary = "验证码登录", description = "使用手机号/邮箱和短信验证码登录")
     public AuthResponse loginByCode(@Valid @RequestBody LoginByCodeRequest request, ClientInfo clientInfo) {
@@ -126,6 +131,7 @@ public class AuthController {
      * @param clientInfo 客户端信息（IP 与 User-Agent），记录审计日志。
      * @return 空响应，HTTP 204 No Content。
      */
+    @RateLimit
     @PostMapping("/password/reset")
     @Operation(summary = "重置密码", description = "使用验证码重置密码")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request, ClientInfo clientInfo) {
