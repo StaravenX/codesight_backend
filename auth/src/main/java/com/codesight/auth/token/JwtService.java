@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.codesight.auth.config.AuthProperties;
 import com.codesight.user.User;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ public class JwtService {
     private final JwtDecoder jwtDecoder;
     private final AuthProperties properties;
     private final RefreshTokenStore refreshTokenStore;
+    private final Clock clock;
 
     /**
      * 为指定用户签发一对 Access/Refresh Token 并自动存入白名单。
@@ -47,7 +49,7 @@ public class JwtService {
      */
     public TokenPair issueTokenPair(User user) {
         String refreshTokenId = UUID.randomUUID().toString();
-        Instant issuedAt = Instant.now();
+        Instant issuedAt = Instant.now(clock);
         Instant accessExpiresAt = issuedAt.plus(properties.getJwt().getAccessTokenTtl());
         Instant refreshExpiresAt = issuedAt.plus(properties.getJwt().getRefreshTokenTtl());
 
