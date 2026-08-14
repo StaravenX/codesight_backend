@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -78,6 +79,7 @@ public class AuthService {
      * @return 认证响应，包含用户信息与令牌对。
      * @throws BusinessException 当未同意协议、标识冲突、验证码失败、密码不合规时抛出。
      */
+    @Transactional(rollbackFor = Exception.class)
     public AuthResponse register(RegisterRequest request, ClientInfo clientInfo) {
         String identifier = request.identifier();
         try {
@@ -262,6 +264,7 @@ public class AuthService {
      * 重置密码
      * @param request 重置密码请求
      */
+    @Transactional(rollbackFor = Exception.class)
     public void resetPassword(@Valid PasswordResetRequest request, ClientInfo clientInfo) {
         String code = request.code();
         String newPassword = request.newPassword();

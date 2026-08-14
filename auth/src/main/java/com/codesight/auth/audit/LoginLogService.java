@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.codesight.auth.audit.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -22,7 +23,7 @@ public class LoginLogService extends ServiceImpl<LoginLogMapper, LoginLog> {
      * @param userAgent 客户端 UA。
      * @param status    结果：SUCCESS/FAILED。
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void save(Long userId, String identifier, LoginChannel channel, String ip, String userAgent, LoginStatus status) {
         LoginLog log = LoginLog.builder()
                 .userId(userId)
