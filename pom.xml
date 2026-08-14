@@ -20,6 +20,7 @@
         <module>user</module>
         <module>common</module>
         <module>auth</module>
+        <module>storage</module>
     </modules>
 
     <properties>
