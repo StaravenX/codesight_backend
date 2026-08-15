@@ -10,48 +10,36 @@
     <artifactId>app</artifactId>
     <name>app</name>
     <description>app</description>
-    <url/>
-    <licenses>
-        <license/>
-    </licenses>
-    <developers>
-        <developer/>
-    </developers>
-    <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
-    </scm>
-    <properties>
-        <java.version>21</java.version>
-    </properties>
 
     <dependencies>
+        <!-- Common -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
         </dependency>
+
+        <!-- User -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>user</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
         </dependency>
+
+        <!-- Auth -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>auth</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
         </dependency>
+
+        <!-- Storage -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>storage</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
         </dependency>
+
+        <!-- Profile -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>profile</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
         </dependency>
     </dependencies>
 

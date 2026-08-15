@@ -13,17 +13,17 @@
     <description>storage</description>
 
     <dependencies>
+        <!-- Common -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>common</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Aliyun OSS -->
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>alibabacloud-oss-v2</artifactId>
-            <version>0.5.1</version>
         </dependency>
     </dependencies>
+
 </project>
