@@ -1,6 +1,5 @@
 package com.codesight.profile.service;
 
-import com.codesight.auth.token.JwtService;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
@@ -9,7 +8,6 @@ import com.codesight.storage.service.StorageService;
 import com.codesight.user.User;
 import com.codesight.user.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,21 +23,18 @@ public class ProfileService {
 
     private final UserService userService;
     private final StorageService storageService;
-    private final JwtService jwtService;
 
     /**
      * 更新个人资料（支持局部字段 PATCH 更新）
      *
-     * @param jwt 当前请求绑定的 JWT 令牌
+     * @param userId  当前登录用户 ID
      * @param request 局部更新请求
      * @return 更新后的最新快照
      */
     @Transactional(rollbackFor = Exception.class)
-    public ProfileResponse updateProfile(Jwt jwt, ProfilePatchRequest request) {
-        long userId = jwtService.extractUserId(jwt);
-
-        User user = userService.getById(userId);
-        if (user == null) {
+    public ProfileResponse updateProfile(long userId, ProfilePatchRequest request) {
+        User current = userService.getById(userId);
+        if (current == null) {
             throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在");
         }
 
@@ -56,16 +51,14 @@ public class ProfileService {
     /**
      * 上传头像并持久化回写用户资料
      *
-     * @param jwt  当前请求绑定的 JWT 令牌
-     * @param file 前端上传的头像文件
+     * @param userId 当前登录用户 ID
+     * @param file   前端上传的头像文件
      * @return 更新后的最新快照
      */
     @Transactional(rollbackFor = Exception.class)
-    public ProfileResponse uploadAvatar(Jwt jwt, MultipartFile file) {
-        long userId = jwtService.extractUserId(jwt);
-
-        User user = userService.getById(userId);
-        if (user == null) {
+    public ProfileResponse uploadAvatar(long userId, MultipartFile file) {
+        User current = userService.getById(userId);
+        if (current == null) {
             throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在");
         }
 
