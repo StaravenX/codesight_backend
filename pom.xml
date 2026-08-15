@@ -21,6 +21,7 @@
         <module>common</module>
         <module>auth</module>
         <module>storage</module>
+        <module>profile</module>
     </modules>
 
     <properties>
