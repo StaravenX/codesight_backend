@@ -1,4 +1,4 @@
-package com.codesight.common.config;
+package com.codesight.app.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
