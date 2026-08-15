@@ -2,6 +2,7 @@ package com.codesight.common.config;
 
 import com.codesight.common.web.ClientInfoArgumentResolver;
 import com.codesight.common.web.RateLimitInterceptor;
+import com.codesight.common.web.UserIdArgumentResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -35,6 +36,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(new ClientInfoArgumentResolver());
+        resolvers.add(new UserIdArgumentResolver());
     }
 
     @Override
