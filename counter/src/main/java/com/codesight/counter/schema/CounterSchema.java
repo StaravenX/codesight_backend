@@ -1,0 +1,117 @@
+package com.codesight.counter.schema;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.UtilityClass;
+
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 计数系统 Schema 规范与常量定义。
+ * <p>
+ * 1. 文章维度 SDS 内存排布（16 字节）：
+ *    [0~3B: views 阅读数] [4~7B: like 点赞数] [8~11B: comment 评论数] [12~15B: favorite 收藏数]
+ * <p>
+ * 2. 用户维度 SDS 内存排布（16 字节）：
+ *    [0~3B: viewsReceived 获得阅读数] [4~7B: likesReceived 获得点赞数] [8~11B: followers 粉丝数] [12~15B: followings 关注数]
+ */
+@UtilityClass
+public class CounterSchema {
+
+    public static final String SCHEMA_ID = "v1";
+    public static final int FIELD_SIZE = 4; // 每个指标字段占用 4 字节 (Int32)
+
+    // ==================== 文章维度 ====================
+    public static final int ARTICLE_SCHEMA_LEN = Metric.values().length;
+    public static final int ARTICLE_TOTAL_BYTES = FIELD_SIZE * ARTICLE_SCHEMA_LEN; // 16 字节
+
+    /**
+     * 文章维度核心互动指标枚举
+     */
+    @Getter
+    @RequiredArgsConstructor
+    public enum Metric {
+        VIEWS(0, "views"),
+        LIKE(1, "like"),
+        COMMENT(2, "comment"),
+        FAVORITE(3, "favorite");
+
+        private final int index;
+        private final String code;
+
+        public int offset() {
+            return this.index * FIELD_SIZE;
+        }
+
+        private static final Map<String, Metric> CODE_MAP = Arrays.stream(values())
+                .collect(Collectors.toUnmodifiableMap(Metric::getCode, m -> m));
+
+        public static Metric fromCode(String code) {
+            return CODE_MAP.get(code);
+        }
+    }
+
+    // ==================== 用户维度 ====================
+    public static final int USER_SCHEMA_LEN = UserMetric.values().length;
+    public static final int USER_TOTAL_BYTES = FIELD_SIZE * USER_SCHEMA_LEN; // 16 字节
+
+    /**
+     * 用户维度核心互动指标枚举
+     */
+    @Getter
+    @RequiredArgsConstructor
+    public enum UserMetric {
+        VIEWS_RECEIVED(0, "viewsReceived"),
+        LIKES_RECEIVED(1, "likesReceived"),
+        FOLLOWERS(2, "followers"),
+        FOLLOWINGS(3, "followings");
+
+        private final int index;
+        private final String code;
+
+        public int offset() {
+            return this.index * FIELD_SIZE;
+        }
+
+        private static final Map<String, UserMetric> CODE_MAP = Arrays.stream(values())
+                .collect(Collectors.toUnmodifiableMap(UserMetric::getCode, m -> m));
+
+        public static UserMetric fromCode(String code) {
+            return CODE_MAP.get(code);
+        }
+    }
+
+    // ==================== 编解码工具方法 ====================
+
+    /**
+     * 以大端序从字节数组指定偏移量读取 32 位无符号整型
+     *
+     * @param buf 字节数组
+     * @param off 起始偏移量
+     * @return 无符号数值
+     */
+    public static long readInt32BE(byte[] buf, int off) {
+        if (buf == null || off + FIELD_SIZE > buf.length) {
+            return 0L;
+        }
+        return Integer.toUnsignedLong(ByteBuffer.wrap(buf).getInt(off));
+    }
+
+    /**
+     * 以大端序将 32 位数值写入字节数组指定偏移量
+     *
+     * @param buf 目标字节数组
+     * @param off 起始偏移量
+     * @param val 待写入数值
+     */
+    public static void writeInt32BE(byte[] buf, int off, long val) {
+        if (buf == null || off + FIELD_SIZE > buf.length) {
+            return;
+        }
+        int intVal = (int) Math.clamp(val, 0, 0xFFFF_FFFFL);
+        ByteBuffer.wrap(buf).putInt(off, intVal);
+    }
+}
