@@ -41,6 +41,13 @@
             <groupId>com.codesight</groupId>
             <artifactId>profile</artifactId>
         </dependency>
+
+        <!-- Counter -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>counter</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>
