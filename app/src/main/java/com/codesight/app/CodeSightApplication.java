@@ -7,10 +7,12 @@ import org.springframework.context.annotation.ComponentScan;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @ComponentScan(basePackages = "com.codesight")
 @MapperScan(basePackages = "com.codesight", annotationClass = Mapper.class)
+@EnableScheduling
 public class CodeSightApplication {
 
 	public static void main(String[] args) {
