@@ -29,4 +29,10 @@ public class CounterKeys {
         return String.format("bm:%s:%s:%s:%d", metric, entityType, entityId, chunk);
     }
 
+    /**
+     * 1秒写聚合增量暂存桶（Hash）：agg:v1:{entityType}:{entityId}
+     */
+    public static String aggKey(String entityType, String entityId) {
+        return String.format("agg:%s:%s:%s", CounterSchema.SCHEMA_ID, entityType, entityId);
+    }
 }
