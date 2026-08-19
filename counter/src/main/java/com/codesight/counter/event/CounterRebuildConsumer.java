@@ -2,6 +2,7 @@ package com.codesight.counter.event;
 
 import com.codesight.counter.schema.CounterKeys;
 import com.codesight.counter.schema.CounterSchema;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,6 +18,7 @@ import java.util.List;
  * 默认关闭，仅当 counter.rebuild.enabled=true 时启用。
  */
 @Service
+@Slf4j
 @ConditionalOnProperty(name = "counter.rebuild.enabled", havingValue = "true")
 public class CounterRebuildConsumer {
 
@@ -30,7 +32,7 @@ public class CounterRebuildConsumer {
 
     @KafkaListener(
             topics = CounterEvent.TOPIC,
-            groupId = "counter-rebuild",
+            groupId = "counter-rebuild-#{T(java.lang.System).currentTimeMillis()}", // 全新group id，支持多次重复回放
             properties = {"auto.offset.reset=earliest"}
     )
     public void onMessage(CounterEvent event, Acknowledgment ack) {
@@ -46,7 +48,8 @@ public class CounterRebuildConsumer {
                     String.valueOf(event.delta()));
             ack.acknowledge(); // 写入成功后提交位点，避免重复回放
         } catch (Exception ex) {
-            // 不提交位点以便重试
+            log.error("灾难全量回放事件失败, event={}, sdsKey={}", event, sdsKey, ex);
+            throw ex;
         }
     }
 }
