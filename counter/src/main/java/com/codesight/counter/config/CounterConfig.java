@@ -4,6 +4,9 @@ import com.codesight.counter.event.CounterEvent;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.support.converter.RecordMessageConverter;
 import org.springframework.kafka.support.converter.StringJsonMessageConverter;
@@ -33,4 +36,25 @@ public class CounterConfig {
                 .build();
     }
 
+    /**
+     * 16 字节 SDS 原位原子累加 Lua 脚本
+     */
+    @Bean("incrFieldScript")
+    public RedisScript<Long> incrFieldScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("lua/incr_field.lua"));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    /**
+     * Hash 暂存桶原子安全扣减 Lua 脚本
+     */
+    @Bean("decrFieldScript")
+    public RedisScript<Long> decrFieldScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("lua/decr_field.lua"));
+        script.setResultType(Long.class);
+        return script;
+    }
 }

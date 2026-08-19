@@ -22,14 +22,12 @@ import java.util.stream.Collectors;
 public class CounterSchema {
 
     public static final String SCHEMA_ID = "v1";
-    public static final int FIELD_SIZE = 4; // 每个指标字段占用 4 字节 (Int32)
-
-    // ==================== 文章维度 ====================
-    public static final int ARTICLE_SCHEMA_LEN = Metric.values().length;
-    public static final int ARTICLE_TOTAL_BYTES = FIELD_SIZE * ARTICLE_SCHEMA_LEN; // 16 字节
+    public static final int FIELD_SIZE = 4; // 每个维度的大小(4字节 = 32位)
+    public static final int SCHEMA_LEN = 4; // 维度的数量
+    public static final int TOTAL_BYTES = FIELD_SIZE * SCHEMA_LEN;
 
     /**
-     * 文章维度核心互动指标枚举
+     * 文章/内容维度核心互动指标枚举
      */
     @Getter
     @RequiredArgsConstructor
@@ -54,12 +52,8 @@ public class CounterSchema {
         }
     }
 
-    // ==================== 用户维度 ====================
-    public static final int USER_SCHEMA_LEN = UserMetric.values().length;
-    public static final int USER_TOTAL_BYTES = FIELD_SIZE * USER_SCHEMA_LEN; // 16 字节
-
     /**
-     * 用户维度核心互动指标枚举
+     * 创作者/博主维度核心画像指标枚举
      */
     @Getter
     @RequiredArgsConstructor
