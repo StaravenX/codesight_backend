@@ -57,4 +57,15 @@ public class CounterConfig {
         script.setResultType(Long.class);
         return script;
     }
+
+    /**
+     * 4KB 分片位图翻转与幂等判定 Lua 脚本
+     */
+    @Bean("toggleBitScript")
+    public RedisScript<Long> toggleBitScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("lua/toggle_bit.lua"));
+        script.setResultType(Long.class);
+        return script;
+    }
 }

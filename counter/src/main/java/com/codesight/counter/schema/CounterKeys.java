@@ -28,4 +28,11 @@ public class CounterKeys {
     public static String aggKey(String entityType, String entityId) {
         return String.format("agg:%s:%s:%s", CounterSchema.SCHEMA_ID, entityType, entityId);
     }
+
+    /**
+     * SDS 自愈重建分布式锁键：lock:sds-rebuild:{entityType}:{entityId}
+     */
+    public static String rebuildLockKey(String entityType, String entityId) {
+        return String.format("lock:sds-rebuild:%s:%s", entityType, entityId);
+    }
 }
