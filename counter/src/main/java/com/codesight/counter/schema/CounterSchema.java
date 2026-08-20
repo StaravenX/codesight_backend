@@ -5,9 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 计数系统 Schema 规范与常量定义。
@@ -27,11 +24,23 @@ public class CounterSchema {
     public static final int TOTAL_BYTES = FIELD_SIZE * SCHEMA_LEN;
 
     /**
+     * 统一指标契约接口
+     */
+    public interface MetricItem {
+        int getIndex();
+        String getCode();
+
+        default int offset() {
+            return getIndex() * FIELD_SIZE;
+        }
+    }
+
+    /**
      * 文章/内容维度核心互动指标枚举
      */
     @Getter
     @RequiredArgsConstructor
-    public enum Metric {
+    public enum Metric implements MetricItem {
         VIEWS(0, "views"),
         LIKE(1, "like"),
         COMMENT(2, "comment"),
@@ -39,17 +48,6 @@ public class CounterSchema {
 
         private final int index;
         private final String code;
-
-        public int offset() {
-            return this.index * FIELD_SIZE;
-        }
-
-        private static final Map<String, Metric> CODE_MAP = Arrays.stream(values())
-                .collect(Collectors.toUnmodifiableMap(Metric::getCode, m -> m));
-
-        public static Metric fromCode(String code) {
-            return CODE_MAP.get(code);
-        }
     }
 
     /**
@@ -57,7 +55,7 @@ public class CounterSchema {
      */
     @Getter
     @RequiredArgsConstructor
-    public enum UserMetric {
+    public enum UserMetric implements MetricItem {
         VIEWS_RECEIVED(0, "viewsReceived"),
         LIKES_RECEIVED(1, "likesReceived"),
         FOLLOWERS(2, "followers"),
@@ -65,17 +63,6 @@ public class CounterSchema {
 
         private final int index;
         private final String code;
-
-        public int offset() {
-            return this.index * FIELD_SIZE;
-        }
-
-        private static final Map<String, UserMetric> CODE_MAP = Arrays.stream(values())
-                .collect(Collectors.toUnmodifiableMap(UserMetric::getCode, m -> m));
-
-        public static UserMetric fromCode(String code) {
-            return CODE_MAP.get(code);
-        }
     }
 
     // ==================== 编解码工具方法 ====================
