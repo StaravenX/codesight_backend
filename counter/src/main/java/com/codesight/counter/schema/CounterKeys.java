@@ -16,10 +16,10 @@ public class CounterKeys {
     }
 
     /**
-     * 4KB 分片位图事实判重层键：bm:{metric}:{entityType}:{entityId}:{chunk}
+     * 4KB 分片位图事实判重层键：bm:{entityType}:{entityId}:{metric}:{chunk}
      */
-    public static String bitmapKey(String metric, String entityType, String entityId, long chunk) {
-        return String.format("bm:%s:%s:%s:%d", metric, entityType, entityId, chunk);
+    public static String bitmapKey(String entityType, String entityId, String metric, long chunk) {
+        return String.format("bm:%s:%s:%s:%d", entityType, entityId, metric, chunk);
     }
 
     /**
