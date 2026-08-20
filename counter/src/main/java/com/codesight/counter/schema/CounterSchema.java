@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 计数系统 Schema 规范与常量定义。
@@ -65,6 +67,19 @@ public class CounterSchema {
         private final String code;
     }
 
+    /**
+     * 根据业务实体类型动态获取对应的指标契约列表
+     *
+     * @param entityType 业务实体类型（如 "article", "user"）
+     * @return 对应的 MetricItem 指标数组
+     */
+    public static MetricItem[] getMetrics(String entityType) {
+        if ("user".equalsIgnoreCase(entityType)) {
+            return UserMetric.values();
+        }
+        return Metric.values();
+    }
+
     // ==================== 编解码工具方法 ====================
 
     /**
@@ -94,5 +109,23 @@ public class CounterSchema {
         }
         int intVal = (int) Math.clamp(val, 0, 0xFFFF_FFFFL);
         ByteBuffer.wrap(buf).putInt(off, intVal);
+    }
+
+    /**
+     * 将 16 字节定长二进制 SDS 字节数组解码为指标 Map
+     *
+     * @param entityType 业务实体类型（如 "article", "user"）
+     * @param raw        原始 16 字节数组
+     * @return 各指标键值 Map，若 raw 为空或长度不足 16 字节则返回 null
+     */
+    public static Map<String, Long> decodeSds(String entityType, byte[] raw) {
+        if (raw == null || raw.length != TOTAL_BYTES) {
+            return null;
+        }
+        Map<String, Long> result = new HashMap<>();
+        for (MetricItem m : getMetrics(entityType)) {
+            result.put(m.getCode(), readInt32BE(raw, m.offset()));
+        }
+        return result;
     }
 }
