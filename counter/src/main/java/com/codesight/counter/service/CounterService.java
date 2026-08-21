@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -27,12 +28,16 @@ import java.util.concurrent.TimeUnit;
  * 核心能力：
  * 1. 状态事实层翻转与判重（4KB 分片位图 + Lua 脚本 + Kafka 异步削峰）；
  * 2. 状态查询与位图聚合（单用户 isSet 5微秒判重 + bitCountShards 管道化聚合统计）；
- * 3. 16 字节定长二进制 SDS 纳秒级单查与 MGET 原生批量查询；
- * 4. 容灾自愈重建体系（Redisson 分布式锁防击穿 + DCL 双重检查 + CounterRebuilder SPI 策略路由）。
+ * 3. 短时防刷与防抖去重（5分钟 PV 滑动防抖 increaseView ➔ 自动触发异步递增）；
+ * 4. 标量增量异步聚合（纯标量 increase 异步投递 + N:1 倍写折叠）；
+ * 5. 16 字节定长二进制 SDS 纳秒级单查与 MGET 原生批量查询；
+ * 6. 容灾自愈重建体系（Redisson 分布式锁防击穿 + DCL 双重检查 + CounterRebuilder SPI 策略路由）。
  */
 @Slf4j
 @Service
 public class CounterService {
+
+    private static final Duration PV_DEDUP_TTL = Duration.ofMinutes(5);
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RedisScript<Long> toggleBitScript;
@@ -158,6 +163,31 @@ public class CounterService {
                 userId,
                 delta
         ));
+    }
+
+    /**
+     * 增加浏览量（自动执行 5 分钟短时防刷）
+     *
+     * @param entityType 业务实体类型（如 "article"）
+     * @param entityId   业务实体唯一标识
+     * @param userId     当前登录用户 ID（可为空）
+     * @param clientIp   客户端 IP 地址（游客防刷依据）
+     */
+    public void increaseView(String entityType, String entityId, Long userId, String clientIp) {
+        String identifier = (userId != null) ? "u:" + userId : "ip:" + (clientIp != null ? clientIp : "unknown");
+        String dedupKey = CounterKeys.pvDedupKey(entityType, entityId, identifier);
+
+        Boolean isFirstVisit = stringRedisTemplate.opsForValue().setIfAbsent(dedupKey, "1", PV_DEDUP_TTL);
+
+        if (Boolean.TRUE.equals(isFirstVisit)) {
+            increase(
+                    entityType,
+                    entityId,
+                    CounterSchema.Metric.VIEWS,
+                    userId != null ? userId : 0L,
+                    1
+            );
+        }
     }
 
     /**
