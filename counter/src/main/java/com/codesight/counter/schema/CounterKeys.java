@@ -35,4 +35,11 @@ public class CounterKeys {
     public static String rebuildLockKey(String entityType, String entityId) {
         return String.format("lock:sds-rebuild:%s:%s", entityType, entityId);
     }
+
+    /**
+     * PV 浏览量 5 分钟短时防刷与去重键：pv:dedup:{entityType}:{entityId}:{identifier}
+     */
+    public static String pvDedupKey(String entityType, String entityId, String identifier) {
+        return String.format("pv:dedup:%s:%s:%s", entityType, entityId, identifier);
+    }
 }

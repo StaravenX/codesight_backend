@@ -19,6 +19,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -196,5 +197,57 @@ class CounterServiceTest {
 
         long count = counterService.bitCountShards("article", "1001", "like");
         assertEquals(0L, count);
+    }
+
+    @Test
+    @DisplayName("测试 increaseView：已登录用户首次访问（放行并异步累加 PV）")
+    void testIncreaseViewUserFirstVisit() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:u:888"), eq("1"), any(Duration.class)))
+                .thenReturn(true);
+
+        counterService.increaseView("article", "1001", 888L, "127.0.0.1");
+
+        ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
+        verify(eventProducer, times(1)).publish(captor.capture());
+
+        CounterEvent event = captor.getValue();
+        assertEquals("article", event.entityType());
+        assertEquals("1001", event.entityId());
+        assertEquals("views", event.metric());
+        assertEquals(888L, event.userId());
+        assertEquals(1, event.delta());
+    }
+
+    @Test
+    @DisplayName("测试 increaseView：未登录游客首次访问（基于 IP 放行并异步累加 PV）")
+    void testIncreaseViewAnonymousFirstVisit() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:ip:192.168.1.100"), eq("1"), any(Duration.class)))
+                .thenReturn(true);
+
+        counterService.increaseView("article", "1001", null, "192.168.1.100");
+
+        ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
+        verify(eventProducer, times(1)).publish(captor.capture());
+
+        CounterEvent event = captor.getValue();
+        assertEquals("article", event.entityType());
+        assertEquals("1001", event.entityId());
+        assertEquals("views", event.metric());
+        assertEquals(0L, event.userId());
+        assertEquals(1, event.delta());
+    }
+
+    @Test
+    @DisplayName("测试 increaseView：5 分钟内重复访问（静默拦截，不触发 Kafka 异步递增）")
+    void testIncreaseViewRepeatedVisit() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class)))
+                .thenReturn(false);
+
+        counterService.increaseView("article", "1001", 888L, "127.0.0.1");
+
+        verify(eventProducer, never()).publish(any());
     }
 }
