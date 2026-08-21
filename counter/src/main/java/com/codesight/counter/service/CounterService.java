@@ -4,6 +4,7 @@ import com.codesight.counter.event.CounterEvent;
 import com.codesight.counter.event.CounterEventProducer;
 import com.codesight.counter.schema.BitmapShard;
 import com.codesight.counter.schema.CounterKeys;
+import com.codesight.counter.schema.CounterRebuilder;
 import com.codesight.counter.schema.CounterSchema;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -17,16 +18,17 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 通用高并发计数服务。
  * <p>
  * 核心能力：
- * 1. 状态事实层翻转与判重（4KB 分片位图 + Lua + Kafka 异步削峰）；
- * 2. 状态查询（判断当前用户是否已点赞/已收藏/已关注）；
+ * 1. 状态事实层翻转与判重（4KB 分片位图 + Lua 脚本 + Kafka 异步削峰）；
+ * 2. 状态查询与位图聚合（单用户 isSet 5微秒判重 + bitCountShards 管道化聚合统计）；
  * 3. 16 字节定长二进制 SDS 纳秒级单查与 MGET 原生批量查询；
- * 4. 容灾自愈重建（Redisson 分布式锁 + 管道 BITCOUNT 真值回填）。
+ * 4. 容灾自愈重建体系（Redisson 分布式锁防击穿 + DCL 双重检查 + CounterRebuilder SPI 策略路由）。
  */
 @Slf4j
 @Service
@@ -36,16 +38,23 @@ public class CounterService {
     private final RedisScript<Long> toggleBitScript;
     private final CounterEventProducer eventProducer;
     private final RedissonClient redisson;
+    private final Map<String, CounterRebuilder> rebuilderMap = new ConcurrentHashMap<>();
 
     public CounterService(
             StringRedisTemplate stringRedisTemplate,
             @Qualifier("toggleBitScript") RedisScript<Long> toggleBitScript,
             CounterEventProducer eventProducer,
-            RedissonClient redisson) {
+            RedissonClient redisson,
+            List<CounterRebuilder> rebuilders) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.toggleBitScript = toggleBitScript;
         this.eventProducer = eventProducer;
         this.redisson = redisson;
+        if (rebuilders != null) {
+            for (CounterRebuilder rebuilder : rebuilders) {
+                this.rebuilderMap.put(rebuilder.entityType().toLowerCase(), rebuilder);
+            }
+        }
     }
 
     /**
@@ -90,6 +99,44 @@ public class CounterService {
         String bmKey = CounterKeys.bitmapKey(entityType, entityId, metric.getCode(), chunk);
         Boolean state = stringRedisTemplate.opsForValue().getBit(bmKey, bit);
         return Boolean.TRUE.equals(state);
+    }
+
+    /**
+     * 管道化扫描并统计指定实体与指标的所有 4KB 分片位图总数（BITCOUNT）
+     *
+     * @param entityType 业务实体类型（如 "article", "user"）
+     * @param entityId   业务实体唯一标识
+     * @param metricCode 指标代码（如 "like", "favorite", "followers"）
+     * @return 该指标当前在所有 4KB 分片位图中的状态激活总人数
+     */
+    public long bitCountShards(String entityType, String entityId, String metricCode) {
+        String pattern = CounterKeys.bitmapKey(entityType, entityId, metricCode, 0)
+                .replaceAll("0$", "*");
+
+        Set<String> shardKeys = stringRedisTemplate.keys(pattern);
+        if (shardKeys.isEmpty()) {
+            return 0L;
+        }
+
+        List<byte[]> keys = shardKeys.stream()
+                .map(k -> k.getBytes(StandardCharsets.UTF_8))
+                .toList();
+
+        List<Object> counts = stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            RedisStringCommands stringCommands = connection.stringCommands();
+            for (byte[] k : keys) {
+                stringCommands.bitCount(k);
+            }
+            return null;
+        });
+
+        long total = 0L;
+        for (Object cnt : counts) {
+            if (cnt instanceof Long val) {
+                total += val;
+            }
+        }
+        return total;
     }
 
     /**
@@ -160,7 +207,7 @@ public class CounterService {
     }
 
     /**
-     * 基于 4KB 分片位图事实层强制自愈重建 16 字节 SDS 计数快照
+     * 调用相应模块的 rebuilder 实现类重建 16 字节 SDS 计数快照
      *
      * @param entityType 实体类型
      * @param entityId   实体 ID
@@ -181,11 +228,8 @@ public class CounterService {
                 Map<String, Long> res = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
                 if (res != null) return res;
 
-                Map<String, Long> fallback = new HashMap<>();
-                for (CounterSchema.MetricItem m : metrics) {
-                    fallback.put(m.getCode(), bitCountShardsPipelined(m.getCode(), entityType, entityId));
-                }
-                return fallback;
+                CounterRebuilder rebuilder = rebuilderMap.get(entityType.toLowerCase());
+                return rebuilder != null ? rebuilder.rebuild(entityId) : getDefaultZeroCounts(entityType);
             }
 
             // 双重检查锁（DCL）：检查其他并发线程是否已完成重建
@@ -194,15 +238,18 @@ public class CounterService {
 
             log.info("触发 16B SDS 自愈重建: entityType={}, entityId={}", entityType, entityId);
 
+            CounterRebuilder rebuilder = rebuilderMap.get(entityType.toLowerCase());
+            Map<String, Long> result = (rebuilder != null)
+                    ? rebuilder.rebuild(entityId)
+                    : getDefaultZeroCounts(entityType);
+
             byte[] newSds = new byte[CounterSchema.TOTAL_BYTES];
-            Map<String, Long> result = new HashMap<>();
             List<String> rebuildFields = new ArrayList<>();
 
             // 扫描位图事实层，管道化 BITCOUNT 统计各指标真值
             for (CounterSchema.MetricItem m : metrics) {
-                long sum = bitCountShardsPipelined(m.getCode(), entityType, entityId);
-                CounterSchema.writeInt32BE(newSds, m.offset(), sum);
-                result.put(m.getCode(), sum);
+                long val = result.getOrDefault(m.getCode(), 0L);
+                CounterSchema.writeInt32BE(newSds, m.offset(), val);
                 rebuildFields.add(String.valueOf(m.getIndex()));
             } 
 
@@ -219,7 +266,8 @@ public class CounterService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("自愈重建被中断: entityType={}, entityId={}", entityType, entityId, e);
-            return getDefaultZeroCounts(entityType);
+            Map<String, Long> lastCheck = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
+            return lastCheck != null ? lastCheck : getDefaultZeroCounts(entityType);
         } finally {
             if (locked && lock.isHeldByCurrentThread()) {
                 lock.unlock();
@@ -247,36 +295,6 @@ public class CounterService {
         stringRedisTemplate.execute((RedisCallback<Boolean>) connection ->
                 connection.stringCommands().set(key.getBytes(StandardCharsets.UTF_8), bytes)
         );
-    }
-
-    private long bitCountShardsPipelined(String metricCode, String entityType, String entityId) {
-        String pattern = CounterKeys.bitmapKey(entityType, entityId, metricCode, 0)
-                .replaceAll("0$", "*");
-
-        Set<String> shardKeys = stringRedisTemplate.keys(pattern);
-        if (shardKeys.isEmpty()) {
-            return 0L;
-        }
-
-        List<byte[]> keys = shardKeys.stream()
-                .map(k -> k.getBytes(StandardCharsets.UTF_8))
-                .toList();
-
-        List<Object> counts = stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            RedisStringCommands stringCommands = connection.stringCommands();
-            for (byte[] k : keys) {
-                stringCommands.bitCount(k);
-            }
-            return null;
-        });
-
-        long total = 0L;
-        for (Object cnt : counts) {
-            if (cnt instanceof Long val) {
-                total += val;
-            }
-        }
-        return total;
     }
 
     private Map<String, Long> getDefaultZeroCounts(String entityType) {
