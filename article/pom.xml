@@ -7,9 +7,9 @@
         <artifactId>codesight_backend</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>app</artifactId>
-    <name>app</name>
-    <description>app</description>
+    <artifactId>article</artifactId>
+    <name>article</name>
+    <description>article</description>
 
     <dependencies>
         <!-- Common -->
@@ -18,50 +18,36 @@
             <artifactId>common</artifactId>
         </dependency>
 
-        <!-- User -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>user</artifactId>
-        </dependency>
-
-        <!-- Auth -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>auth</artifactId>
-        </dependency>
-
-        <!-- Storage -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>storage</artifactId>
-        </dependency>
-
-        <!-- Profile -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>profile</artifactId>
-        </dependency>
-
-        <!-- Counter -->
+        <!-- counter -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>counter</artifactId>
         </dependency>
 
-        <!-- Article -->
+        <!-- storage -->
         <dependency>
             <groupId>com.codesight</groupId>
-            <artifactId>article</artifactId>
+            <artifactId>storage</artifactId>
+        </dependency>
+
+        <!-- user -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>user</artifactId>
+        </dependency>
+
+        <!-- MyBatisPlus -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+
+        <!-- MySQL -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>
