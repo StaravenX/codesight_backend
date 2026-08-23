@@ -23,6 +23,7 @@
         <module>storage</module>
         <module>profile</module>
         <module>counter</module>
+        <module>article</module>
     </modules>
 
     <properties>
@@ -61,6 +62,16 @@
             <dependency>
                 <groupId>com.codesight</groupId>
                 <artifactId>profile</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codesight</groupId>
+                <artifactId>counter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codesight</groupId>
+                <artifactId>article</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
