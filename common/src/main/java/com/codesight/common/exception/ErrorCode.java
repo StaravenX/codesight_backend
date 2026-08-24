@@ -1,8 +1,10 @@
 package com.codesight.common.exception;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
 public enum ErrorCode {
 
     BAD_REQUEST("BAD_REQUEST", "业务参数错误", 400),
@@ -26,9 +28,4 @@ public enum ErrorCode {
     final String msg;
     final int httpStatus;
 
-    ErrorCode(String code, String msg, int httpStatus) {
-        this.code = code;
-        this.msg = msg;
-        this.httpStatus = httpStatus;
-    }
 }
