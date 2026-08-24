@@ -1,9 +1,11 @@
 package com.codesight.auth.audit.model;
 
 import com.baomidou.mybatisplus.annotation.EnumValue;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
 public enum LoginChannel {
     REGISTER("REGISTER", "账号注册"),
     PASSWORD("PASSWORD", "密码登录"),
@@ -14,9 +16,4 @@ public enum LoginChannel {
     @EnumValue
     private final String code;
     private final String description;
-
-    LoginChannel(String code, String description) {
-        this.code = code;
-        this.description = description;
-    }
 }

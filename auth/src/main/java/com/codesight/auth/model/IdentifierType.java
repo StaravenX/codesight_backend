@@ -1,22 +1,21 @@
 package com.codesight.auth.model;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 /**
  * 用户登录类型
  * <p>
  * 判断用户是手机号登录还是邮箱登录
  */
+@Getter
+@AllArgsConstructor
 public enum IdentifierType {
-    PHONE,
-    EMAIL;
+    PHONE("phone", "手机号"),
+    EMAIL("email", "邮箱");
 
-    public static IdentifierType fromString(String value) {
-        if (value == null) {
-            throw new IllegalArgumentException("identifier type required");
-        }
-        return switch (value.toLowerCase()) {
-            case "phone", "mobile" -> PHONE;
-            case "email" -> EMAIL;
-            default -> throw new IllegalArgumentException("Unsupported identifier type: " + value);
-        };
-    }
+    @JsonValue
+    private final String value;
+    private final String description;
 }
