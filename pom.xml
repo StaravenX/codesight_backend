@@ -34,6 +34,7 @@
         <hutool.version>5.8.47</hutool.version>
         <bouncycastle.version>1.78.1</bouncycastle.version>
         <aliyun-oss-v2.version>0.5.1</aliyun-oss-v2.version>
+        <commonmark.version>0.30.0</commonmark.version>
     </properties>
 
     <dependencyManagement>
@@ -105,6 +106,11 @@
                 <groupId>com.aliyun</groupId>
                 <artifactId>alibabacloud-oss-v2</artifactId>
                 <version>${aliyun-oss-v2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.commonmark</groupId>
+                <artifactId>commonmark</artifactId>
+                <version>${commonmark.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
