@@ -1,6 +1,7 @@
 package com.codesight.counter.event;
 
 import com.codesight.counter.schema.CounterKeys;
+import com.codesight.counter.schema.CounterSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,10 +51,10 @@ class CounterAggregationConsumerTest {
     void testOnMessage() {
         when(redis.opsForHash()).thenReturn(hashOperations);
 
-        CounterEvent event = CounterEvent.of("article", "1001", "like", 1, 99L, 1);
+        CounterEvent event = CounterEvent.of(CounterSchema.EntityType.ARTICLE, "1001", "like", 1, 99L, 1);
         consumer.onMessage(event, ack);
 
-        String expectedAggKey = CounterKeys.aggKey("article", "1001");
+        String expectedAggKey = CounterKeys.aggKey(CounterSchema.EntityType.ARTICLE, "1001");
         verify(hashOperations, times(1)).increment(expectedAggKey, "1", 1);
         verify(ack, times(1)).acknowledge();
     }

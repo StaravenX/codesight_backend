@@ -59,7 +59,7 @@ class CounterServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(mockArticleRebuilder.entityType()).thenReturn("article");
+        lenient().when(mockArticleRebuilder.entityType()).thenReturn(CounterSchema.EntityType.ARTICLE);
 
         List<CounterRebuilder> rebuilders = Collections.singletonList(mockArticleRebuilder);
         counterService = new CounterService(
@@ -81,14 +81,14 @@ class CounterServiceTest {
                 eq("add")
         )).thenReturn(1L);
 
-        boolean result = counterService.toggle("article", "1001", CounterSchema.Metric.LIKE, 10L, true);
+        boolean result = counterService.toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE, 10L, true);
 
         assertTrue(result);
         ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
         verify(eventProducer, times(1)).publish(captor.capture());
 
         CounterEvent event = captor.getValue();
-        assertEquals("article", event.entityType());
+        assertEquals(CounterSchema.EntityType.ARTICLE, event.entityType());
         assertEquals("1001", event.entityId());
         assertEquals("like", event.metric());
         assertEquals(1, event.idx());
@@ -106,7 +106,7 @@ class CounterServiceTest {
                 eq("add")
         )).thenReturn(0L);
 
-        boolean result = counterService.toggle("article", "1001", CounterSchema.Metric.LIKE, 10L, true);
+        boolean result = counterService.toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE, 10L, true);
 
         assertFalse(result);
         verify(eventProducer, never()).publish(any());
@@ -118,7 +118,7 @@ class CounterServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.getBit(anyString(), eq(15L))).thenReturn(true);
 
-        boolean isLiked = counterService.isSet("article", "1001", CounterSchema.Metric.LIKE, 15L);
+        boolean isLiked = counterService.isSet(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE, 15L);
         assertTrue(isLiked);
     }
 
@@ -126,11 +126,11 @@ class CounterServiceTest {
     @DisplayName("测试 increase：纯标量增量投递与 delta=0 忽略")
     void testIncrease() {
         // 增量正常投递
-        counterService.increase("article", "1001", CounterSchema.Metric.VIEWS, 999L, 1);
+        counterService.increase(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.VIEWS, 999L, 1);
         verify(eventProducer, times(1)).publish(any(CounterEvent.class));
 
         // delta=0 忽略
-        counterService.increase("article", "1001", CounterSchema.Metric.VIEWS, 999L, 0);
+        counterService.increase(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.VIEWS, 999L, 0);
         verify(eventProducer, times(1)).publish(any(CounterEvent.class)); // 仍然只有 1 次
     }
 
@@ -138,20 +138,20 @@ class CounterServiceTest {
     @DisplayName("测试 getCounts：缓存命中直接读取 16B SDS，不触发重建")
     void testGetCountsCacheHit() {
         byte[] raw = new byte[CounterSchema.TOTAL_BYTES];
-        CounterSchema.writeInt32BE(raw, CounterSchema.Metric.VIEWS.offset(), 500L);
-        CounterSchema.writeInt32BE(raw, CounterSchema.Metric.LIKE.offset(), 30L);
-        CounterSchema.writeInt32BE(raw, CounterSchema.Metric.COMMENT.offset(), 5L);
-        CounterSchema.writeInt32BE(raw, CounterSchema.Metric.FAVORITE.offset(), 12L);
+        CounterSchema.writeInt32BE(raw, CounterSchema.ArticleMetric.VIEWS.offset(), 500L);
+        CounterSchema.writeInt32BE(raw, CounterSchema.ArticleMetric.LIKE.offset(), 30L);
+        CounterSchema.writeInt32BE(raw, CounterSchema.ArticleMetric.COMMENT.offset(), 5L);
+        CounterSchema.writeInt32BE(raw, CounterSchema.ArticleMetric.FAVORITE.offset(), 12L);
 
         when(stringRedisTemplate.execute(any(RedisCallback.class))).thenReturn(raw);
 
-        Map<String, Long> counts = counterService.getCounts("article", "1001");
+        Map<CounterSchema.MetricItem, Long> counts = counterService.getCounts(CounterSchema.EntityType.ARTICLE, "1001");
 
         assertNotNull(counts);
-        assertEquals(500L, counts.get("views"));
-        assertEquals(30L, counts.get("like"));
-        assertEquals(5L, counts.get("comment"));
-        assertEquals(12L, counts.get("favorite"));
+        assertEquals(500L, counts.get(CounterSchema.ArticleMetric.VIEWS));
+        assertEquals(30L, counts.get(CounterSchema.ArticleMetric.LIKE));
+        assertEquals(5L, counts.get(CounterSchema.ArticleMetric.COMMENT));
+        assertEquals(12L, counts.get(CounterSchema.ArticleMetric.FAVORITE));
 
         verify(redisson, never()).getLock(anyString());
     }
@@ -168,22 +168,22 @@ class CounterServiceTest {
         when(lock.isHeldByCurrentThread()).thenReturn(true);
 
         // 3. 模拟业务策略重建真值
-        Map<String, Long> rebuilderResult = new HashMap<>();
-        rebuilderResult.put("views", 10000L);
-        rebuilderResult.put("like", 800L);
-        rebuilderResult.put("comment", 50L);
-        rebuilderResult.put("favorite", 200L);
+        Map<CounterSchema.MetricItem, Long> rebuilderResult = new HashMap<>();
+        rebuilderResult.put(CounterSchema.ArticleMetric.VIEWS, 10000L);
+        rebuilderResult.put(CounterSchema.ArticleMetric.LIKE, 800L);
+        rebuilderResult.put(CounterSchema.ArticleMetric.COMMENT, 50L);
+        rebuilderResult.put(CounterSchema.ArticleMetric.FAVORITE, 200L);
         when(mockArticleRebuilder.rebuild("1001")).thenReturn(rebuilderResult);
 
         when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
 
-        Map<String, Long> counts = counterService.getCounts("article", "1001");
+        Map<CounterSchema.MetricItem, Long> counts = counterService.getCounts(CounterSchema.EntityType.ARTICLE, "1001");
 
         assertNotNull(counts);
-        assertEquals(10000L, counts.get("views"));
-        assertEquals(800L, counts.get("like"));
-        assertEquals(50L, counts.get("comment"));
-        assertEquals(200L, counts.get("favorite"));
+        assertEquals(10000L, counts.get(CounterSchema.ArticleMetric.VIEWS));
+        assertEquals(800L, counts.get(CounterSchema.ArticleMetric.LIKE));
+        assertEquals(50L, counts.get(CounterSchema.ArticleMetric.COMMENT));
+        assertEquals(200L, counts.get(CounterSchema.ArticleMetric.FAVORITE));
 
         // 验证调用了策略与锁释放
         verify(mockArticleRebuilder, times(1)).rebuild("1001");
@@ -195,7 +195,7 @@ class CounterServiceTest {
     void testBitCountShardsEmpty() {
         when(stringRedisTemplate.keys(anyString())).thenReturn(Collections.emptySet());
 
-        long count = counterService.bitCountShards("article", "1001", "like");
+        long count = counterService.bitCountShards(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE);
         assertEquals(0L, count);
     }
 
@@ -206,13 +206,13 @@ class CounterServiceTest {
         when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:u:888"), eq("1"), any(Duration.class)))
                 .thenReturn(true);
 
-        counterService.increaseView("article", "1001", 888L, "127.0.0.1");
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", 888L, "127.0.0.1");
 
         ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
         verify(eventProducer, times(1)).publish(captor.capture());
 
         CounterEvent event = captor.getValue();
-        assertEquals("article", event.entityType());
+        assertEquals(CounterSchema.EntityType.ARTICLE, event.entityType());
         assertEquals("1001", event.entityId());
         assertEquals("views", event.metric());
         assertEquals(888L, event.userId());
@@ -226,13 +226,13 @@ class CounterServiceTest {
         when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:ip:192.168.1.100"), eq("1"), any(Duration.class)))
                 .thenReturn(true);
 
-        counterService.increaseView("article", "1001", null, "192.168.1.100");
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", null, "192.168.1.100");
 
         ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
         verify(eventProducer, times(1)).publish(captor.capture());
 
         CounterEvent event = captor.getValue();
-        assertEquals("article", event.entityType());
+        assertEquals(CounterSchema.EntityType.ARTICLE, event.entityType());
         assertEquals("1001", event.entityId());
         assertEquals("views", event.metric());
         assertEquals(0L, event.userId());
@@ -246,7 +246,7 @@ class CounterServiceTest {
         when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class)))
                 .thenReturn(false);
 
-        counterService.increaseView("article", "1001", 888L, "127.0.0.1");
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", 888L, "127.0.0.1");
 
         verify(eventProducer, never()).publish(any());
     }

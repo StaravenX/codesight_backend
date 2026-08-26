@@ -20,21 +20,20 @@ public class CounterIT {
 
     @Test
     void testLikeIntegrationFlow() throws InterruptedException {
-        String entityType = "article";
+        CounterSchema.EntityType entityType = CounterSchema.EntityType.ARTICLE;
         String entityId = String.valueOf(System.currentTimeMillis());
         long userId = 999L;
 
-        boolean liked = counterService.toggle(entityType, entityId, CounterSchema.Metric.LIKE, userId, true);
+        boolean liked = counterService.toggle(entityType, entityId, CounterSchema.ArticleMetric.LIKE, userId, true);
         assertTrue(liked);
 
-        boolean stateInBitmap = counterService.isSet(entityType, entityId, CounterSchema.Metric.LIKE, userId);
+        boolean stateInBitmap = counterService.isSet(entityType, entityId, CounterSchema.ArticleMetric.LIKE, userId);
         assertTrue(stateInBitmap);
 
         Thread.sleep(2000);
 
-        Map<String, Long> counts = counterService.getCounts(entityType, entityId);
-        long likeCount = counts.getOrDefault(CounterSchema.Metric.LIKE.getCode(), 0L);
-        System.out.println("likeCount = " + likeCount);
+        Map<CounterSchema.MetricItem, Long> counts = counterService.getCounts(entityType, entityId);
+        long likeCount = counts.getOrDefault(CounterSchema.ArticleMetric.LIKE, 0L);
         assertEquals(1L, likeCount);
     }
 }

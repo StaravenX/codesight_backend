@@ -74,7 +74,7 @@ public class CounterAggregationConsumer {
 
             String[] parts = aggKey.split(":", 4);
 
-            String entityType = parts[2];
+            CounterSchema.EntityType entityType = CounterSchema.EntityType.valueOf(parts[2].toUpperCase());
             String entityId = parts[3];
 
             String sdsKey = CounterKeys.sdsKey(entityType, entityId);

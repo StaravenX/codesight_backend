@@ -1,5 +1,7 @@
 package com.codesight.counter.event;
 
+import com.codesight.counter.schema.CounterSchema;
+
 /**
  * 通用计数变更领域事件（不可变 Record）。
  * <p>
@@ -14,7 +16,7 @@ package com.codesight.counter.event;
  * @param delta      计数值变动增量（正向触发为 +1，反向取消为 -1）
  */
 public record CounterEvent(
-        String entityType,
+        CounterSchema.EntityType entityType,
         String entityId,
         String metric,
         int idx,
@@ -23,7 +25,7 @@ public record CounterEvent(
 ) {
     public static final String TOPIC = "counter-events";
 
-    public static CounterEvent of(String entityType, String entityId, String metric, int idx, long userId, int delta) {
+    public static CounterEvent of(CounterSchema.EntityType entityType, String entityId, String metric, int idx, long userId, int delta) {
         return new CounterEvent(entityType, entityId, metric, idx, userId, delta);
     }
 }
