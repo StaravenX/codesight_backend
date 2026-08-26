@@ -11,35 +11,35 @@ public class CounterKeys {
     /**
      * 实体维度 16 字节定长 SDS 快照键：cnt:v1:{entityType}:{entityId}
      */
-    public static String sdsKey(String entityType, String entityId) {
-        return String.format("cnt:%s:%s:%s", CounterSchema.SCHEMA_ID, entityType, entityId);
+    public static String sdsKey(CounterSchema.EntityType entityType, String entityId) {
+        return String.format("cnt:%s:%s:%s", CounterSchema.SCHEMA_ID, entityType.name().toLowerCase(), entityId);
     }
 
     /**
      * 4KB 分片位图事实判重层键：bm:{entityType}:{entityId}:{metric}:{chunk}
      */
-    public static String bitmapKey(String entityType, String entityId, String metric, long chunk) {
-        return String.format("bm:%s:%s:%s:%d", entityType, entityId, metric, chunk);
+    public static String bitmapKey(CounterSchema.EntityType entityType, String entityId, String metric, long chunk) {
+        return String.format("bm:%s:%s:%s:%d", entityType.name().toLowerCase(), entityId, metric, chunk);
     }
 
     /**
      * 1秒写聚合削峰暂存桶（Hash）：agg:v1:{entityType}:{entityId}
      */
-    public static String aggKey(String entityType, String entityId) {
-        return String.format("agg:%s:%s:%s", CounterSchema.SCHEMA_ID, entityType, entityId);
+    public static String aggKey(CounterSchema.EntityType entityType, String entityId) {
+        return String.format("agg:%s:%s:%s", CounterSchema.SCHEMA_ID, entityType.name().toLowerCase(), entityId);
     }
 
     /**
      * SDS 自愈重建分布式锁键：lock:sds-rebuild:{entityType}:{entityId}
      */
-    public static String rebuildLockKey(String entityType, String entityId) {
-        return String.format("lock:sds-rebuild:%s:%s", entityType, entityId);
+    public static String rebuildLockKey(CounterSchema.EntityType entityType, String entityId) {
+        return String.format("lock:sds-rebuild:%s:%s", entityType.name().toLowerCase(), entityId);
     }
 
     /**
      * PV 浏览量 5 分钟短时防刷与去重键：pv:dedup:{entityType}:{entityId}:{identifier}
      */
-    public static String pvDedupKey(String entityType, String entityId, String identifier) {
-        return String.format("pv:dedup:%s:%s:%s", entityType, entityId, identifier);
+    public static String pvDedupKey(CounterSchema.EntityType entityType, String entityId, String identifier) {
+        return String.format("pv:dedup:%s:%s:%s", entityType.name().toLowerCase(), entityId, identifier);
     }
 }

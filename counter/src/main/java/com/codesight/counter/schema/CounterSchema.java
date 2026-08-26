@@ -1,7 +1,7 @@
 package com.codesight.counter.schema;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 
 import java.nio.ByteBuffer;
@@ -26,6 +26,18 @@ public class CounterSchema {
     public static final int TOTAL_BYTES = FIELD_SIZE * SCHEMA_LEN;
 
     /**
+     * 业务实体类型枚举
+     */
+    @Getter
+    @AllArgsConstructor
+    public enum EntityType {
+        ARTICLE(ArticleMetric.values()),
+        USER(UserMetric.values());
+
+        private final MetricItem[] metrics;
+    }
+
+    /**
      * 统一指标契约接口
      */
     public interface MetricItem {
@@ -41,8 +53,8 @@ public class CounterSchema {
      * 文章/内容维度核心互动指标枚举
      */
     @Getter
-    @RequiredArgsConstructor
-    public enum Metric implements MetricItem {
+    @AllArgsConstructor
+    public enum ArticleMetric implements MetricItem {
         VIEWS(0, "views"),
         LIKE(1, "like"),
         COMMENT(2, "comment"),
@@ -56,7 +68,7 @@ public class CounterSchema {
      * 创作者/博主维度核心画像指标枚举
      */
     @Getter
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     public enum UserMetric implements MetricItem {
         VIEWS_RECEIVED(0, "viewsReceived"),
         LIKES_RECEIVED(1, "likesReceived"),
@@ -65,19 +77,6 @@ public class CounterSchema {
 
         private final int index;
         private final String code;
-    }
-
-    /**
-     * 根据业务实体类型动态获取对应的指标契约列表
-     *
-     * @param entityType 业务实体类型（如 "article", "user"）
-     * @return 对应的 MetricItem 指标数组
-     */
-    public static MetricItem[] getMetrics(String entityType) {
-        if ("user".equalsIgnoreCase(entityType)) {
-            return UserMetric.values();
-        }
-        return Metric.values();
     }
 
     // ==================== 编解码工具方法 ====================
@@ -112,19 +111,19 @@ public class CounterSchema {
     }
 
     /**
-     * 将 16 字节定长二进制 SDS 字节数组解码为指标 Map
+     * 将 16 字节定长二进制 SDS 字节数组解码为强类型指标 Map
      *
-     * @param entityType 业务实体类型（如 "article", "user"）
+     * @param entityType 业务实体类型（如 ARTICLE, USER）
      * @param raw        原始 16 字节数组
-     * @return 各指标键值 Map，若 raw 为空或长度不足 16 字节则返回 null
+     * @return 各指标枚举 -> 数值 Map，若 raw 为空或长度不足 16 字节则返回 null
      */
-    public static Map<String, Long> decodeSds(String entityType, byte[] raw) {
-        if (raw == null || raw.length != TOTAL_BYTES) {
+    public static Map<MetricItem, Long> decodeSds(EntityType entityType, byte[] raw) {
+        if (raw == null || raw.length != TOTAL_BYTES || entityType == null) {
             return null;
         }
-        Map<String, Long> result = new HashMap<>();
-        for (MetricItem m : getMetrics(entityType)) {
-            result.put(m.getCode(), readInt32BE(raw, m.offset()));
+        Map<MetricItem, Long> result = new HashMap<>();
+        for (MetricItem m : entityType.getMetrics()) {
+            result.put(m, readInt32BE(raw, m.offset()));
         }
         return result;
     }

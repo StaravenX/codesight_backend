@@ -2,10 +2,7 @@ package com.codesight.counter.service;
 
 import com.codesight.counter.event.CounterEvent;
 import com.codesight.counter.event.CounterEventProducer;
-import com.codesight.counter.schema.BitmapShard;
-import com.codesight.counter.schema.CounterKeys;
-import com.codesight.counter.schema.CounterRebuilder;
-import com.codesight.counter.schema.CounterSchema;
+import com.codesight.counter.schema.*;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -43,7 +40,7 @@ public class CounterService {
     private final RedisScript<Long> toggleBitScript;
     private final CounterEventProducer eventProducer;
     private final RedissonClient redisson;
-    private final Map<String, CounterRebuilder> rebuilderMap = new ConcurrentHashMap<>();
+    private final Map<CounterSchema.EntityType, CounterRebuilder> rebuilderMap = new ConcurrentHashMap<>();
 
     public CounterService(
             StringRedisTemplate stringRedisTemplate,
@@ -57,7 +54,7 @@ public class CounterService {
         this.redisson = redisson;
         if (rebuilders != null) {
             for (CounterRebuilder rebuilder : rebuilders) {
-                this.rebuilderMap.put(rebuilder.entityType().toLowerCase(), rebuilder);
+                this.rebuilderMap.put(rebuilder.entityType(), rebuilder);
             }
         }
     }
@@ -67,12 +64,12 @@ public class CounterService {
      *
      * @param entityType 业务实体类型（如 "article", "user", "comment"）
      * @param entityId   业务实体唯一标识
-     * @param metric     指标契约（如 Metric.LIKE, UserMetric.FOLLOWERS）
+     * @param metric     指标契约（如 ArticleMetric.LIKE, UserMetric.FOLLOWERS）
      * @param userId     操作用户 ID
      * @param isAdd      true 为正向添加(+1)，false 为反向取消(-1)
      * @return 状态是否发生真实改变（true 表示状态改变并触发了事件，false 表示幂等拦截）
      */
-    public boolean toggle(String entityType, String entityId, CounterSchema.MetricItem metric, long userId, boolean isAdd) {
+    public boolean toggle(CounterSchema.EntityType entityType, String entityId, CounterSchema.MetricItem metric, long userId, boolean isAdd) {
         long chunk = BitmapShard.chunkOf(userId);
         long bit = BitmapShard.bitOf(userId);
         String bmKey = CounterKeys.bitmapKey(entityType, entityId, metric.getCode(), chunk);
@@ -98,7 +95,7 @@ public class CounterService {
     /**
      * 查询用户对某实体是否处于激活状态（如“是否已点赞/已收藏/已关注”）
      */
-    public boolean isSet(String entityType, String entityId, CounterSchema.MetricItem metric, long userId) {
+    public boolean isSet(CounterSchema.EntityType entityType, String entityId, CounterSchema.MetricItem metric, long userId) {
         long chunk = BitmapShard.chunkOf(userId);
         long bit = BitmapShard.bitOf(userId);
         String bmKey = CounterKeys.bitmapKey(entityType, entityId, metric.getCode(), chunk);
@@ -109,13 +106,13 @@ public class CounterService {
     /**
      * 管道化扫描并统计指定实体与指标的所有 4KB 分片位图总数（BITCOUNT）
      *
-     * @param entityType 业务实体类型（如 "article", "user"）
+     * @param entityType 业务实体类型（如 ARTICLE, USER）
      * @param entityId   业务实体唯一标识
-     * @param metricCode 指标代码（如 "like", "favorite", "followers"）
+     * @param metric     指标枚举契约
      * @return 该指标当前在所有 4KB 分片位图中的状态激活总人数
      */
-    public long bitCountShards(String entityType, String entityId, String metricCode) {
-        String pattern = CounterKeys.bitmapKey(entityType, entityId, metricCode, 0)
+    public long bitCountShards(CounterSchema.EntityType entityType, String entityId, CounterSchema.MetricItem metric) {
+        String pattern = CounterKeys.bitmapKey(entityType, entityId, metric.getCode(), 0)
                 .replaceAll("0$", "*");
 
         Set<String> shardKeys = stringRedisTemplate.keys(pattern);
@@ -149,10 +146,10 @@ public class CounterService {
      *
      * @param entityType 业务实体类型（如 "article", "user"）
      * @param entityId   业务实体唯一标识
-     * @param metric     指标契约（如 Metric.VIEWS, Metric.COMMENT, UserMetric.LIKES_RECEIVED）
+     * @param metric     指标契约（如 ArticleMetric.VIEWS, ArticleMetric.COMMENT, UserMetric.LIKES_RECEIVED）
      * @param delta      变动增量（如 +1, -1）
      */
-    public void increase(String entityType, String entityId, CounterSchema.MetricItem metric, long userId, int delta) {
+    public void increase(CounterSchema.EntityType entityType, String entityId, CounterSchema.MetricItem metric, long userId, int delta) {
         if(delta == 0) return;
 
         eventProducer.publish(CounterEvent.of(
@@ -173,7 +170,7 @@ public class CounterService {
      * @param userId     当前登录用户 ID（可为空）
      * @param clientIp   客户端 IP 地址（游客防刷依据）
      */
-    public void increaseView(String entityType, String entityId, Long userId, String clientIp) {
+    public void increaseView(CounterSchema.EntityType entityType, String entityId, Long userId, String clientIp) {
         String identifier = (userId != null) ? "u:" + userId : "ip:" + (clientIp != null ? clientIp : "unknown");
         String dedupKey = CounterKeys.pvDedupKey(entityType, entityId, identifier);
 
@@ -183,7 +180,7 @@ public class CounterService {
             increase(
                     entityType,
                     entityId,
-                    CounterSchema.Metric.VIEWS,
+                    CounterSchema.ArticleMetric.VIEWS,
                     userId != null ? userId : 0L,
                     1
             );
@@ -195,12 +192,12 @@ public class CounterService {
      *
      * @param entityType 实体类型
      * @param entityId   实体 ID
-     * @return 各指标名称 -> 计数值 Map（如 "views" -> 50000, "like" -> 1200）
+     * @return 各指标契约 -> 计数值 Map（如 ArticleMetric.VIEWS -> 50000, ArticleMetric.LIKE -> 1200）
      */
-    public Map<String, Long> getCounts(String entityType, String entityId) {
+    public Map<CounterSchema.MetricItem, Long> getCounts(CounterSchema.EntityType entityType, String entityId) {
         String sdsKey = CounterKeys.sdsKey(entityType, entityId);
         byte[] raw = getRawBytes(sdsKey);
-        Map<String, Long> counts = CounterSchema.decodeSds(entityType, raw);
+        Map<CounterSchema.MetricItem, Long> counts = CounterSchema.decodeSds(entityType, raw);
         return counts != null ? counts : rebuild(entityType, entityId);
     }
 
@@ -211,7 +208,7 @@ public class CounterService {
      * @param entityIds  实体 ID 列表
      * @return 实体 ID -> 各指标计数值 Map
      */
-    public Map<String, Map<String, Long>> batchGetCounts(String entityType, List<String> entityIds) {
+    public Map<String, Map<CounterSchema.MetricItem, Long>> batchGetCounts(CounterSchema.EntityType entityType, List<String> entityIds) {
         if (entityIds == null || entityIds.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -224,12 +221,12 @@ public class CounterService {
                 connection.stringCommands().mGet(keyBytesList.toArray(new byte[0][]))
         );
 
-        Map<String, Map<String, Long>> resultMap = new HashMap<>();
+        Map<String, Map<CounterSchema.MetricItem, Long>> resultMap = new HashMap<>();
 
         for (int i = 0; i < entityIds.size(); i++) {
             String entityId = entityIds.get(i);
             byte[] raw = (rawList != null && i < rawList.size()) ? rawList.get(i) : null;
-            Map<String, Long> counts = CounterSchema.decodeSds(entityType, raw);
+            Map<CounterSchema.MetricItem, Long> counts = CounterSchema.decodeSds(entityType, raw);
             resultMap.put(entityId, counts != null ? counts : rebuild(entityType, entityId));
         }
 
@@ -243,60 +240,55 @@ public class CounterService {
      * @param entityId   实体 ID
      * @return 重建后的最新计数值
      */
-    public Map<String, Long> rebuild(String entityType, String entityId) {
+    public Map<CounterSchema.MetricItem, Long> rebuild(CounterSchema.EntityType entityType, String entityId) {
         String sdsKey = CounterKeys.sdsKey(entityType, entityId);
         String lockKey = CounterKeys.rebuildLockKey(entityType, entityId);
 
         RLock lock = redisson.getLock(lockKey);
         boolean locked = false;
-        CounterSchema.MetricItem[] metrics = CounterSchema.getMetrics(entityType);
+        CounterSchema.MetricItem[] metrics = entityType.getMetrics();
 
         try {
             // 防击穿互斥保护：非阻塞抢锁
             locked = lock.tryLock(500, TimeUnit.MILLISECONDS);
             if (!locked) {
-                Map<String, Long> res = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
+                Map<CounterSchema.MetricItem, Long> res = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
                 if (res != null) return res;
 
-                CounterRebuilder rebuilder = rebuilderMap.get(entityType.toLowerCase());
+                CounterRebuilder rebuilder = rebuilderMap.get(entityType);
                 return rebuilder != null ? rebuilder.rebuild(entityId) : getDefaultZeroCounts(entityType);
             }
 
             // 双重检查锁（DCL）：检查其他并发线程是否已完成重建
-            Map<String, Long> res = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
+            Map<CounterSchema.MetricItem, Long> res = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
             if (res != null) return res;
 
             log.info("触发 16B SDS 自愈重建: entityType={}, entityId={}", entityType, entityId);
 
-            CounterRebuilder rebuilder = rebuilderMap.get(entityType.toLowerCase());
-            Map<String, Long> result = (rebuilder != null)
+            CounterRebuilder rebuilder = rebuilderMap.get(entityType);
+            Map<CounterSchema.MetricItem, Long> result = (rebuilder != null)
                     ? rebuilder.rebuild(entityId)
                     : getDefaultZeroCounts(entityType);
 
             byte[] newSds = new byte[CounterSchema.TOTAL_BYTES];
-            List<String> rebuildFields = new ArrayList<>();
 
-            // 扫描位图事实层，管道化 BITCOUNT 统计各指标真值
             for (CounterSchema.MetricItem m : metrics) {
-                long val = result.getOrDefault(m.getCode(), 0L);
+                long val = result.getOrDefault(m, 0L);
                 CounterSchema.writeInt32BE(newSds, m.offset(), val);
-                rebuildFields.add(String.valueOf(m.getIndex()));
-            } 
+
+                // 清理 Hash 聚合桶中的对应字段，防止重复加算
+                String aggKey = CounterKeys.aggKey(entityType, entityId);
+                stringRedisTemplate.opsForHash().delete(aggKey, m.getIndex());
+            }
 
             // 回填 16 字节 SDS 快照
             setRawBytes(sdsKey, newSds);
-
-            // 清理 Hash 聚合桶中的对应字段，防止重复加算
-            if (!rebuildFields.isEmpty()) {
-                String aggKey = CounterKeys.aggKey(entityType, entityId);
-                stringRedisTemplate.opsForHash().delete(aggKey, rebuildFields.toArray());
-            }
 
             return result;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("自愈重建被中断: entityType={}, entityId={}", entityType, entityId, e);
-            Map<String, Long> lastCheck = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
+            Map<CounterSchema.MetricItem, Long> lastCheck = CounterSchema.decodeSds(entityType, getRawBytes(sdsKey));
             return lastCheck != null ? lastCheck : getDefaultZeroCounts(entityType);
         } finally {
             if (locked && lock.isHeldByCurrentThread()) {
@@ -327,10 +319,10 @@ public class CounterService {
         );
     }
 
-    private Map<String, Long> getDefaultZeroCounts(String entityType) {
-        Map<String, Long> map = new HashMap<>();
-        for (CounterSchema.MetricItem m : CounterSchema.getMetrics(entityType)) {
-            map.put(m.getCode(), 0L);
+    private Map<CounterSchema.MetricItem, Long> getDefaultZeroCounts(CounterSchema.EntityType entityType) {
+        Map<CounterSchema.MetricItem, Long> map = new HashMap<>();
+        for (CounterSchema.MetricItem m : entityType.getMetrics()) {
+            map.put(m, 0L);
         }
         return map;
     }

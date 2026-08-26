@@ -11,17 +11,17 @@ import java.util.Map;
 public interface CounterRebuilder {
 
     /**
-     * 当前策略支持的业务实体类型 (如 "article", "user", "comment")
+     * 当前策略支持的业务实体类型 (如 ARTICLE, USER)
      *
-     * @return 业务实体类型字符串
+     * @return 业务实体类型枚举
      */
-    String entityType();
+    CounterSchema.EntityType entityType();
 
     /**
      * 执行具体实体的真值重建计算
      *
      * @param entityId 实体全局唯一标识
-     * @return 该实体各个指标的代码与最新真值 Map (如 {"views": 50000L, "like": 1200L, ...})
+     * @return 该实体各个指标契约与最新真值 Map (如 {ArticleMetric.VIEWS: 50000L, ArticleMetric.LIKE: 1200L, ...})
      */
-    Map<String, Long> rebuild(String entityId);
+    Map<CounterSchema.MetricItem, Long> rebuild(String entityId);
 }
