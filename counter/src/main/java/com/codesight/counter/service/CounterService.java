@@ -117,7 +117,7 @@ public class CounterService {
 
         Set<String> shardKeys = stringRedisTemplate.keys(pattern);
         if (shardKeys.isEmpty()) {
-            return 0L;
+            return -1L;
         }
 
         List<byte[]> keys = shardKeys.stream()

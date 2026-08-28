@@ -191,12 +191,12 @@ class CounterServiceTest {
     }
 
     @Test
-    @DisplayName("测试 bitCountShards：无分片时返回 0")
+    @DisplayName("测试 bitCountShards：无分片时返回 -1（代表 Redis 位图缺失）")
     void testBitCountShardsEmpty() {
         when(stringRedisTemplate.keys(anyString())).thenReturn(Collections.emptySet());
 
         long count = counterService.bitCountShards(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE);
-        assertEquals(0L, count);
+        assertEquals(-1L, count);
     }
 
     @Test

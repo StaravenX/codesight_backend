@@ -44,6 +44,11 @@ public class CounterSchema {
         int getIndex();
         String getCode();
 
+        /**
+         * 是否具备 4KB 分片位图事实层（用于区分点赞/关注等状态型指标与浏览/评论等纯计数标量）
+         */
+        boolean isBitmapBacked();
+
         default int offset() {
             return getIndex() * FIELD_SIZE;
         }
@@ -55,13 +60,14 @@ public class CounterSchema {
     @Getter
     @AllArgsConstructor
     public enum ArticleMetric implements MetricItem {
-        VIEWS(0, "views"),
-        LIKE(1, "like"),
-        COMMENT(2, "comment"),
-        FAVORITE(3, "favorite");
+        VIEWS(0, "views", false),
+        LIKE(1, "like", true),
+        COMMENT(2, "comment", false),
+        FAVORITE(3, "favorite", true);
 
         private final int index;
         private final String code;
+        private final boolean bitmapBacked;
     }
 
     /**
@@ -70,13 +76,14 @@ public class CounterSchema {
     @Getter
     @AllArgsConstructor
     public enum UserMetric implements MetricItem {
-        VIEWS_RECEIVED(0, "viewsReceived"),
-        LIKES_RECEIVED(1, "likesReceived"),
-        FOLLOWERS(2, "followers"),
-        FOLLOWINGS(3, "followings");
+        VIEWS_RECEIVED(0, "viewsReceived", false),
+        LIKES_RECEIVED(1, "likesReceived", false),
+        FOLLOWERS(2, "followers", true),
+        FOLLOWINGS(3, "followings", true);
 
         private final int index;
         private final String code;
+        private final boolean bitmapBacked;
     }
 
     // ==================== 编解码工具方法 ====================
