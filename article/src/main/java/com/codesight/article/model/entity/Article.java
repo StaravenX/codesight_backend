@@ -62,6 +62,30 @@ public class Article {
     private Integer wordCount;
 
     /**
+     * 阅读量统计
+     */
+    @Builder.Default
+    private Long viewCount = 0L;
+
+    /**
+     * 点赞量统计
+     */
+    @Builder.Default
+    private Long likeCount = 0L;
+
+    /**
+     * 评论量统计
+     */
+    @Builder.Default
+    private Long commentCount = 0L;
+
+    /**
+     * 收藏量统计
+     */
+    @Builder.Default
+    private Long favoriteCount = 0L;
+
+    /**
      * 创作者主页是否置顶：true=置顶，false=正常
      */
     private Boolean isTop;
