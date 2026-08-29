@@ -22,6 +22,9 @@ public enum ErrorCode {
     LOGIN_LOCKED("LOGIN_LOCKED", "登录失败次数过多，账号已被临时锁定", 423),
     TOO_MANY_REQUESTS("TOO_MANY_REQUESTS", "请求过于频繁，请稍后再试", 429),
     UNAUTHORIZED("UNAUTHORIZED", "登录已失效，请重新登录", 401),
+    CATEGORY_NOT_FOUND("CATEGORY_NOT_FOUND", "所选技术分类不存在", 404),
+    ARTICLE_NOT_FOUND("ARTICLE_NOT_FOUND", "文章不存在或已被删除", 404),
+    ARTICLE_FORBIDDEN("ARTICLE_FORBIDDEN", "无权修改他人文章", 403),
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "服务器内部错误", 500);
 
     final String code;
