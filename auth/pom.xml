@@ -24,6 +24,12 @@
             <artifactId>user</artifactId>
         </dependency>
 
+        <!-- Profile -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>profile</artifactId>
+        </dependency>
+
         <!-- Bouncy Castle -->
         <dependency>
             <groupId>org.bouncycastle</groupId>

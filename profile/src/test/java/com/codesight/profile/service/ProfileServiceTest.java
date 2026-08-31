@@ -115,4 +115,23 @@ class ProfileServiceTest {
 
         assertThrows(BusinessException.class, () -> profileService.uploadAvatar(1L, emptyFile));
     }
+
+    @Test
+    void getProfile_Success() {
+        when(userService.getById(1L)).thenReturn(existingUser);
+
+        ProfileResponse response = profileService.getProfile(1L);
+
+        assertNotNull(response);
+        assertEquals("原昵称", response.nickname());
+        assertEquals("geek_old", response.csId());
+        verify(userService).getById(1L);
+    }
+
+    @Test
+    void getProfile_UserNotFound_ShouldThrowException() {
+        when(userService.getById(999L)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> profileService.getProfile(999L));
+    }
 }

@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * 个人资料响应 DTO
+ * 用户个人资料统一响应体
  */
 @Schema(description = "个人资料响应体")
 public record ProfileResponse(
@@ -53,12 +53,6 @@ public record ProfileResponse(
         @Schema(description = "账号创建时间")
         Instant createdTime
 ) {
-    /**
-     * 从 User 实体转换为对外响应对象
-     *
-     * @param user 用户实体
-     * @return 个人资料响应 DTO
-     */
     public static ProfileResponse from(User user) {
         if (user == null) {
             return null;

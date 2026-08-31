@@ -68,4 +68,22 @@ class ProfileControllerTest {
         assertEquals("https://oss.codesight.cn/avatars/1/test.png", result.avatar());
         verify(profileService).uploadAvatar(1L, file);
     }
+
+    @Test
+    void me_ShouldPassUserIdToServiceAndReturnResponse() {
+        ProfileResponse mockResponse = new ProfileResponse(
+                1L, "测试用户", "avatar.png", "测试简介", "geek_123",
+                "FEMALE", LocalDate.of(1998, 5, 20), "测试公司", "高级研发",
+                "测试大学", "13900000000", "test@bytedance.com", "[\"Go\",\"Java\"]", null
+        );
+
+        when(profileService.getProfile(1L)).thenReturn(mockResponse);
+
+        ProfileResponse result = profileController.me(1L);
+
+        assertNotNull(result);
+        assertEquals("测试用户", result.nickname());
+        assertEquals("geek_123", result.csId());
+        verify(profileService).getProfile(1L);
+    }
 }

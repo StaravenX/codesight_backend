@@ -16,10 +16,10 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * 个人资料接口控制器
  * <p>
- * 提供当前登录用户的个人资料局部更新、头像直传写入等接口。
+ * 提供当前登录用户的个人资料查询、局部更新、头像直传写入等接口。
  * 控制器直接返回业务响应对象，由 GlobalResponseAdvice 统一包装为 Result。
  */
-@Tag(name = "个人资料接口", description = "提供当前登录用户的资料修改与头像更新接口")
+@Tag(name = "个人资料接口", description = "提供当前登录用户的资料查询、修改与头像更新接口")
 @RestController
 @RequestMapping("/api/v1/profile")
 @Validated
@@ -58,5 +58,17 @@ public class ProfileController {
             @RequestPart("file") MultipartFile file
     ) {
         return profileService.uploadAvatar(userId, file);
+    }
+
+    /**
+     * 获取当前登录用户个人资料
+     *
+     * @param userId 当前登录用户 ID
+     * @return 个人资料响应
+     */
+    @Operation(summary = "获取当前用户信息", description = "基于认证上下文返回当前登录用户的完整个人资料")
+    @GetMapping("/me")
+    public ProfileResponse me(@Parameter(hidden = true) @CurrentUserId Long userId) {
+        return profileService.getProfile(userId);
     }
 }

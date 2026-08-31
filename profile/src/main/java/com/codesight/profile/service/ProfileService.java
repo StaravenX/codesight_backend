@@ -78,4 +78,18 @@ public class ProfileService {
         User updated = userService.getById(userId);
         return ProfileResponse.from(updated);
     }
+
+    /**
+     * 获取用户个人资料详情
+     *
+     * @param userId 当前用户 ID
+     * @return 个人资料快照
+     */
+    public ProfileResponse getProfile(long userId) {
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在或已被删除");
+        }
+        return ProfileResponse.from(user);
+    }
 }

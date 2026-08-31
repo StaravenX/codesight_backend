@@ -29,6 +29,18 @@
             <groupId>com.codesight</groupId>
             <artifactId>storage</artifactId>
         </dependency>
+
+        <!-- Counter -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>counter</artifactId>
+        </dependency>
+
+        <!-- Article -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>article</artifactId>
+        </dependency>
     </dependencies>
 
 </project>
