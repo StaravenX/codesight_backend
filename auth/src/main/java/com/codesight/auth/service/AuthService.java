@@ -18,9 +18,9 @@ import com.codesight.auth.verification.model.SendCodeResult;
 import com.codesight.auth.verification.model.VerificationScene;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
+import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.user.User;
 import com.codesight.user.UserService;
-import com.codesight.user.api.dto.UserProfileResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -128,7 +128,7 @@ public class AuthService {
             loginLogService.save(user.getId(), identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(),
                     LoginStatus.SUCCESS);
 
-            return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+            return new AuthResponse(ProfileResponse.from(user), new TokenResponse(tokenPair));
         } catch (BusinessException e) {
             loginLogService.save(null, identifier, LoginChannel.REGISTER, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
             throw e;
@@ -164,7 +164,7 @@ public class AuthService {
                     LoginStatus.SUCCESS);
 
             loginSecurityService.clearFailure(identifier, clientInfo.ip());
-            return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+            return new AuthResponse(ProfileResponse.from(user), new TokenResponse(tokenPair));
         } catch (BusinessException e) {
             Long userId = user != null ? user.getId() : null;
             loginLogService.save(userId, identifier, LoginChannel.PASSWORD, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
@@ -199,7 +199,7 @@ public class AuthService {
                     LoginStatus.SUCCESS);
 
             loginSecurityService.clearFailure(identifier, clientInfo.ip());
-            return new AuthResponse(UserProfileResponse.from(user), new TokenResponse(tokenPair));
+            return new AuthResponse(ProfileResponse.from(user), new TokenResponse(tokenPair));
         } catch (BusinessException e) {
             Long userId = user != null ? user.getId() : null;
             loginLogService.save(userId, identifier, LoginChannel.CODE, clientInfo.ip(), clientInfo.userAgent(), LoginStatus.FAILED);
