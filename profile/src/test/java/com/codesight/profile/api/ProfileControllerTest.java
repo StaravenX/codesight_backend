@@ -1,5 +1,6 @@
 package com.codesight.profile.api;
 
+import com.codesight.profile.api.dto.AuthorCardResponse;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.profile.service.ProfileService;
@@ -85,5 +86,26 @@ class ProfileControllerTest {
         assertEquals("测试用户", result.nickname());
         assertEquals("geek_123", result.csId());
         verify(profileService).getProfile(1L);
+    }
+
+    @Test
+    void getAuthorCard_ShouldPassAuthorIdAndCurrentUserIdToService() {
+        AuthorCardResponse mockCard = new AuthorCardResponse(
+                10L, "作者", "avatar.png", "架构师简介", "技术专家", "测试公司",
+                9999L, 888L, 66L, 18L, true
+        );
+
+        when(profileService.getAuthorCard(eq(10L), eq(1L))).thenReturn(mockCard);
+
+        AuthorCardResponse result = profileController.getAuthorCard(10L, 1L);
+
+        assertNotNull(result);
+        assertEquals(10L, result.id());
+        assertEquals("作者", result.nickname());
+        assertEquals(9999L, result.viewsReceived());
+        assertEquals(888L, result.likesReceived());
+        assertEquals(66L, result.followerCount());
+        assertEquals(18L, result.followingCount());
+        verify(profileService).getAuthorCard(10L, 1L);
     }
 }

@@ -2,6 +2,9 @@ package com.codesight.profile.service;
 
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
+import com.codesight.counter.schema.CounterSchema;
+import com.codesight.counter.service.CounterService;
+import com.codesight.profile.api.dto.AuthorCardResponse;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.storage.service.StorageService;
@@ -12,10 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 /**
  * 个人资料业务服务类
  * <p>
- * 处理用户个人资料的查询、局部字段更新以及头像上传与持久化回写等核心业务。
+ * 处理用户个人资料的查询、局部字段更新、头像上传以及创作者名片多源聚合等核心业务。
  */
 @Service
 @RequiredArgsConstructor
@@ -23,6 +28,7 @@ public class ProfileService {
 
     private final UserService userService;
     private final StorageService storageService;
+    private final CounterService counterService;
 
     /**
      * 更新个人资料（支持局部字段 PATCH 更新）
@@ -91,5 +97,52 @@ public class ProfileService {
             throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "用户不存在或已被删除");
         }
         return ProfileResponse.from(user);
+    }
+
+    /**
+     * 获取创作者公开名片卡片（包含基础资料、16B SDS 获赞/阅读/粉丝计数及关注状态）
+     *
+     * @param authorId      作者用户 ID
+     * @param currentUserId 当前登录用户 ID（可为空）
+     * @return 创作者名片响应体
+     */
+    public AuthorCardResponse getAuthorCard(Long authorId, Long currentUserId) {
+        User author = userService.getById(authorId);
+        if (author == null) {
+            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "作者不存在或已被删除");
+        }
+
+        // 1. 读取 16B SDS 紧凑计数快照
+        Map<CounterSchema.MetricItem, Long> counts = counterService.getCounts(
+                CounterSchema.EntityType.USER,
+                String.valueOf(authorId)
+        );
+
+        long viewsReceived = counts.getOrDefault(CounterSchema.UserMetric.VIEWS_RECEIVED, 0L);
+        long likesReceived = counts.getOrDefault(CounterSchema.UserMetric.LIKES_RECEIVED, 0L);
+        long followerCount = counts.getOrDefault(CounterSchema.UserMetric.FOLLOWERS, 0L);
+        long followingCount = counts.getOrDefault(CounterSchema.UserMetric.FOLLOWINGS, 0L);
+
+        // 2. 判定当前登录用户是否已关注该作者（4KB 分片位图）
+        boolean isFollowed = currentUserId != null && counterService.isSet(
+                        CounterSchema.EntityType.USER,
+                        String.valueOf(authorId),
+                        CounterSchema.UserMetric.FOLLOWERS,
+                        currentUserId
+                );
+
+        return new AuthorCardResponse(
+                author.getId(),
+                author.getNickname(),
+                author.getAvatar(),
+                author.getBio(),
+                author.getJobTitle(),
+                author.getCompany(),
+                viewsReceived,
+                likesReceived,
+                followerCount,
+                followingCount,
+                isFollowed
+        );
     }
 }

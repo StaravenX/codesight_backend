@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS tags (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(64) NOT NULL COMMENT '标签名称，如：Java, Docker, Vue.js, Python',
-    icon_url VARCHAR(512) NULL COMMENT '标签图标 URL',
     article_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '该标签下文章聚合计数',
     PRIMARY KEY (id),
     UNIQUE KEY uk_tags_name (name)
@@ -40,6 +39,8 @@ CREATE TABLE IF NOT EXISTS articles (
     cover_url VARCHAR(512) NULL COMMENT '文章列表封面图 URL',
     content_md LONGTEXT NULL COMMENT 'Markdown 格式正文字符串',
     word_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '正文字数统计',
+    read_time_minutes INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '预估阅读时长（单位：分钟）',
+    toc_json LONGTEXT NULL COMMENT 'Markdown AST 提炼的目录导航树 JSON',
     view_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '阅读量统计',
     like_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '点赞量统计',
     comment_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '评论量统计',
