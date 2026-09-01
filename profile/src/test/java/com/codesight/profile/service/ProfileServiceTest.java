@@ -1,6 +1,9 @@
 package com.codesight.profile.service;
 
 import com.codesight.common.exception.BusinessException;
+import com.codesight.counter.schema.CounterSchema;
+import com.codesight.counter.service.CounterService;
+import com.codesight.profile.api.dto.AuthorCardResponse;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.storage.service.StorageService;
@@ -15,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +35,9 @@ class ProfileServiceTest {
 
     @Mock
     private StorageService storageService;
+
+    @Mock
+    private CounterService counterService;
 
     @InjectMocks
     private ProfileService profileService;
@@ -133,5 +140,38 @@ class ProfileServiceTest {
         when(userService.getById(999L)).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> profileService.getProfile(999L));
+    }
+
+    @Test
+    void getAuthorCard_Success_WithFollowStatus() {
+        when(userService.getById(1L)).thenReturn(existingUser);
+        when(counterService.getCounts(eq(CounterSchema.EntityType.USER), eq("1")))
+                .thenReturn(Map.of(
+                        CounterSchema.UserMetric.VIEWS_RECEIVED, 1200L,
+                        CounterSchema.UserMetric.LIKES_RECEIVED, 350L,
+                        CounterSchema.UserMetric.FOLLOWERS, 88L,
+                        CounterSchema.UserMetric.FOLLOWINGS, 32L
+                ));
+        when(counterService.isSet(eq(CounterSchema.EntityType.USER), eq("1"), eq(CounterSchema.UserMetric.FOLLOWERS), eq(2L)))
+                .thenReturn(true);
+
+        AuthorCardResponse card = profileService.getAuthorCard(1L, 2L);
+
+        assertNotNull(card);
+        assertEquals(1L, card.id());
+        assertEquals("原昵称", card.nickname());
+        assertEquals("old_avatar.png", card.avatar());
+        assertEquals(1200L, card.viewsReceived());
+        assertEquals(350L, card.likesReceived());
+        assertEquals(88L, card.followerCount());
+        assertEquals(32L, card.followingCount());
+        assertTrue(card.isFollowed());
+    }
+
+    @Test
+    void getAuthorCard_AuthorNotFound_ShouldThrowException() {
+        when(userService.getById(999L)).thenReturn(null);
+
+        assertThrows(BusinessException.class, () -> profileService.getAuthorCard(999L, null));
     }
 }

@@ -1,14 +1,17 @@
 package com.codesight.article.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.ArticleVisible;
+import com.codesight.article.util.MarkdownParseResult.TocItem;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 文章核心持久化实体
@@ -17,7 +20,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("articles")
+@TableName(value = "articles", autoResultMap = true)
 public class Article {
 
     /**
@@ -60,6 +63,17 @@ public class Article {
      * 正文字数统计
      */
     private Integer wordCount;
+
+    /**
+     * 预估阅读时长（单位：分钟）
+     */
+    private Integer readTimeMinutes;
+
+    /**
+     * Markdown AST 提炼的目录导航树（JSON 格式持久化存储）
+     */
+    @TableField(value = "toc_json", typeHandler = JacksonTypeHandler.class)
+    private List<TocItem> toc;
 
     /**
      * 阅读量统计
