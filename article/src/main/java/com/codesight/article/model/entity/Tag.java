@@ -30,11 +30,6 @@ public class Tag {
     private String name;
 
     /**
-     * 标签图标 URL
-     */
-    private String iconUrl;
-
-    /**
      * 该标签下文章聚合计数
      */
     private Long articleCount;
