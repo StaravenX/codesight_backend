@@ -13,8 +13,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -100,12 +99,13 @@ class ProfileControllerTest {
         AuthorCardResponse result = profileController.getAuthorCard(10L, 1L);
 
         assertNotNull(result);
-        assertEquals(10L, result.id());
-        assertEquals("作者", result.nickname());
-        assertEquals(9999L, result.viewsReceived());
-        assertEquals(888L, result.likesReceived());
-        assertEquals(66L, result.followerCount());
-        assertEquals(18L, result.followingCount());
+        assertEquals(10L, result.getId());
+        assertEquals("作者", result.getNickname());
+        assertEquals(9999L, result.getViewsReceived());
+        assertEquals(888L, result.getLikesReceived());
+        assertEquals(66L, result.getFollowerCount());
+        assertEquals(18L, result.getFollowingCount());
+        assertTrue(result.isFollowed());
         verify(profileService).getAuthorCard(10L, 1L);
     }
 }

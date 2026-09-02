@@ -7,6 +7,7 @@ import com.codesight.article.api.dto.response.ArticleCreateResponse;
 import com.codesight.article.api.dto.response.ArticleDetailResponse;
 import com.codesight.article.api.dto.response.ArticlePatchResponse;
 import com.codesight.article.mapper.*;
+import com.codesight.article.model.dto.ArticleDetailStatic;
 import com.codesight.article.model.entity.*;
 import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.ArticleVisible;
@@ -14,7 +15,6 @@ import com.codesight.article.util.MarkdownParseResult;
 import com.codesight.article.util.MarkdownParser;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
-import com.codesight.article.api.dto.response.TagResponse;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -42,33 +41,33 @@ public class ArticleService {
 
     private final ArticleMapper articleMapper;
     private final CategoryMapper categoryMapper;
-    private final TagMapper tagMapper;
     private final ArticleTagRelMapper articleTagRelMapper;
-    private final CounterService counterService;
     private final CategoryTagRelMapper categoryTagRelMapper;
+    private final CounterService counterService;
+    private final ArticleCacheService articleCacheService;
 
     @Transactional(rollbackFor = Exception.class)
     public ArticleCreateResponse createArticle(ArticleCreateRequest request, Long authorId) {
 
         // 1. 校验一级技术分类是否存在
-        Category category = categoryMapper.selectById(request.getCategoryId());
+        Category category = categoryMapper.selectById(request.categoryId());
         if (category == null) {
             throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
         // 2. 校验关联标签（若提供）
-        validateTagIds(request.getTagIds(), request.getCategoryId());
+        validateTagIds(request.tagIds(), request.categoryId());
 
         // 3. 调用 AST 引擎提炼摘要、字数、预估阅读时长与目录树
-        MarkdownParseResult parseResult = MarkdownParser.parse(request.getContentMd());
-        String summary = (request.getSummary() != null && !request.getSummary().isBlank())
-                ? request.getSummary().trim()
+        MarkdownParseResult parseResult = MarkdownParser.parse(request.contentMd());
+        String summary = (request.summary() != null && !request.summary().isBlank())
+                ? request.summary().trim()
                 : parseResult.getSummary();
         int wordCount = parseResult.getWordCount();
         int readTimeMinutes = parseResult.getReadTimeMinutes();
 
         // 4. 判定草稿还是直接公开发布
-        boolean isDraft = Boolean.TRUE.equals(request.getIsDraft());
+        boolean isDraft = Boolean.TRUE.equals(request.isDraft());
         ArticleStatus status = isDraft ? ArticleStatus.DRAFT : ArticleStatus.PUBLISHED;
         Instant now = Instant.now();
         Instant publishTime = isDraft ? null : now;
@@ -76,11 +75,11 @@ public class ArticleService {
         // 5. 构建并插入文章主表（预计算字段全量存盘）
         Article article = Article.builder()
                 .authorId(authorId)
-                .categoryId(request.getCategoryId())
-                .title(request.getTitle().trim())
+                .categoryId(request.categoryId())
+                .title(request.title().trim())
                 .summary(summary)
-                .coverUrl(request.getCoverUrl())
-                .contentMd(request.getContentMd())
+                .coverUrl(request.coverUrl())
+                .contentMd(request.contentMd())
                 .wordCount(wordCount)
                 .readTimeMinutes(readTimeMinutes)
                 .toc(parseResult.getToc())
@@ -95,14 +94,11 @@ public class ArticleService {
         Long articleId = article.getId();
 
         // 6. 保存标签多对多关联关系
-        saveArticleTags(articleId, request.getTagIds());
+        saveArticleTags(articleId, request.tagIds());
 
         log.info("文章创建成功: articleId={}, authorId={}, status={}", articleId, authorId, status);
 
-        return ArticleCreateResponse.builder()
-                .id(articleId)
-                .status(status)
-                .build();
+        return new ArticleCreateResponse(articleId, status);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -119,70 +115,69 @@ public class ArticleService {
         }
 
         // 3. 分类校验（若修改分类）
-        if (request.getCategoryId() != null) {
-            Category category = categoryMapper.selectById(request.getCategoryId());
+        if (request.categoryId() != null) {
+            Category category = categoryMapper.selectById(request.categoryId());
             if (category == null) {
                 throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
             }
-            article.setCategoryId(request.getCategoryId());
+            article.setCategoryId(request.categoryId());
         }
 
         // 4. 标题更新
-        if (request.getTitle() != null && !request.getTitle().isBlank()) {
-            article.setTitle(request.getTitle().trim());
+        if (request.title() != null && !request.title().isBlank()) {
+            article.setTitle(request.title().trim());
         }
 
         // 5. 正文更新（自动重新计算 AST 字数、阅读时长、TOC 目录树与摘要）
-        if (request.getContentMd() != null) {
-            article.setContentMd(request.getContentMd());
-            MarkdownParseResult parseResult = MarkdownParser.parse(request.getContentMd());
+        if (request.contentMd() != null) {
+            article.setContentMd(request.contentMd());
+            MarkdownParseResult parseResult = MarkdownParser.parse(request.contentMd());
             article.setWordCount(parseResult.getWordCount());
             article.setReadTimeMinutes(parseResult.getReadTimeMinutes());
             article.setToc(parseResult.getToc());
-            if (request.getSummary() == null || request.getSummary().isBlank()) {
+            if (request.summary() == null || request.summary().isBlank()) {
                 article.setSummary(parseResult.getSummary());
             }
         }
 
         // 6. 显式摘要更新
-        if (request.getSummary() != null && !request.getSummary().isBlank()) {
-            article.setSummary(request.getSummary().trim());
+        if (request.summary() != null && !request.summary().isBlank()) {
+            article.setSummary(request.summary().trim());
         }
 
         // 7. 封面、置顶、可见性更新
-        if (request.getCoverUrl() != null) {
-            article.setCoverUrl(request.getCoverUrl());
+        if (request.coverUrl() != null) {
+            article.setCoverUrl(request.coverUrl());
         }
-        if (request.getIsTop() != null) {
-            article.setIsTop(request.getIsTop());
+        if (request.isTop() != null) {
+            article.setIsTop(request.isTop());
         }
-        if (request.getVisible() != null) {
-            article.setVisible(request.getVisible());
+        if (request.visible() != null) {
+            article.setVisible(request.visible());
         }
 
         // 8. 状态流转处理（草稿首次公开发布记录 publishTime）
-        if (request.getStatus() != null) {
-            if (article.getStatus() == ArticleStatus.DRAFT && request.getStatus() == ArticleStatus.PUBLISHED) {
+        if (request.status() != null) {
+            if (article.getStatus() == ArticleStatus.DRAFT && request.status() == ArticleStatus.PUBLISHED) {
                 article.setPublishTime(Instant.now());
             }
-            article.setStatus(request.getStatus());
+            article.setStatus(request.status());
         }
 
         // 9. 更新文章标签关联关系
-        if (request.getTagIds() != null) {
-            validateTagIds(request.getTagIds(), article.getCategoryId());
+        if (request.tagIds() != null) {
+            validateTagIds(request.tagIds(), article.getCategoryId());
             articleTagRelMapper.delete(new LambdaQueryWrapper<ArticleTagRel>()
                     .eq(ArticleTagRel::getArticleId, articleId));
-            saveArticleTags(articleId, request.getTagIds());
+            saveArticleTags(articleId, request.tagIds());
         }
 
         articleMapper.updateById(article);
+        // 更新数据库后，删除缓存
+        articleCacheService.evictCache(articleId);
         log.info("文章更新成功: articleId={}, authorId={}, status={}", articleId, authorId, article.getStatus());
 
-        return ArticlePatchResponse.builder()
-                .id(articleId)
-                .status(article.getStatus())
-                .build();
+        return new ArticlePatchResponse(articleId, article.getStatus());
     }
 
     /**
@@ -193,18 +188,18 @@ public class ArticleService {
      * @return 文章详情全量响应体
      */
     public ArticleDetailResponse getDetail(Long id, Long userId) {
-        Article article = articleMapper.selectById(id);
-        if (article == null || article.getStatus() == ArticleStatus.DELETED) {
-            throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND, "文章不存在或已被删除");
-        }
-
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            // 1. 获取文章计数
+            // 1. 获取静态元数据
+            Future<ArticleDetailStatic> staticFuture = executor.submit(() ->
+                    articleCacheService.getStaticDetail(id)
+            );
+
+            // 2. 获取实时计数
             Future<Map<CounterSchema.MetricItem, Long>> countsFuture = executor.submit(() ->
                     counterService.getCounts(CounterSchema.EntityType.ARTICLE, String.valueOf(id))
             );
 
-            // 2. 获取互动状态
+            // 3. 获取互动状态
             Future<Boolean> isLikedFuture = executor.submit(() ->
                     (userId != null && userId > 0) &&
                     counterService.isSet(CounterSchema.EntityType.ARTICLE, String.valueOf(id), CounterSchema.ArticleMetric.LIKE, userId)
@@ -214,20 +209,21 @@ public class ArticleService {
                     counterService.isSet(CounterSchema.EntityType.ARTICLE, String.valueOf(id), CounterSchema.ArticleMetric.FAVORITE, userId)
             );
 
-            // 3. 获取标签列表
-            Future<List<TagResponse>> tagsFuture = executor.submit(() -> getArticleTags(id));
+            // 获取静态数据并校验存在性
+            ArticleDetailStatic staticDto = staticFuture.get();
+            if (staticDto == null) {
+                throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND, "文章不存在或已被删除");
+            }
 
-            // 并行结果获取
+            // 获取计数与互动状态
             Map<CounterSchema.MetricItem, Long> counts = countsFuture.get();
             Boolean isLiked = isLikedFuture.get();
             Boolean isFavorited = isFavoritedFuture.get();
-            List<TagResponse> tags = tagsFuture.get();
 
             // 组合结果
             ArticleDetailResponse response = new ArticleDetailResponse();
-            BeanUtils.copyProperties(article, response);
+            BeanUtils.copyProperties(staticDto, response);
 
-            response.setTags(tags);
             response.setViewCount(counts.getOrDefault(CounterSchema.ArticleMetric.VIEWS, 0L));
             response.setLikeCount(counts.getOrDefault(CounterSchema.ArticleMetric.LIKE, 0L));
             response.setCommentCount(counts.getOrDefault(CounterSchema.ArticleMetric.COMMENT, 0L));
@@ -238,6 +234,9 @@ public class ArticleService {
             return response;
 
         } catch (InterruptedException | ExecutionException e) {
+            if (e.getCause() instanceof BusinessException be) {
+                throw be;
+            }
             log.error("获取文章详情并发聚合失败: articleId={}", id, e);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "获取文章详情失败");
         }
@@ -280,28 +279,5 @@ public class ArticleService {
                     .build();
             articleTagRelMapper.insert(rel);
         }
-    }
-
-    /**
-     * 根据文章 ID 查询关联的二级技术标签列表
-     */
-    private List<TagResponse> getArticleTags(Long articleId) {
-        List<ArticleTagRel> rels = articleTagRelMapper.selectList(
-                new LambdaQueryWrapper<ArticleTagRel>().eq(ArticleTagRel::getArticleId, articleId)
-        );
-        if (rels == null || rels.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> tagIds = rels.stream().map(ArticleTagRel::getTagId).toList();
-        List<Tag> tags = tagMapper.selectByIds(tagIds);
-        if (tags == null || tags.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return tags.stream()
-                .map(tag -> TagResponse.builder()
-                        .id(tag.getId())
-                        .name(tag.getName())
-                        .build())
-                .toList();
     }
 }

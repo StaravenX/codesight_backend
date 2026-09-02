@@ -9,10 +9,11 @@ import com.codesight.article.mapper.*;
 import com.codesight.article.model.entity.Article;
 import com.codesight.article.model.entity.ArticleTagRel;
 import com.codesight.article.model.entity.Category;
-import com.codesight.article.model.entity.Tag;
 import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
+import com.codesight.article.api.dto.response.TagResponse;
+import com.codesight.article.model.dto.ArticleDetailStatic;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,9 +43,6 @@ public class ArticleServiceTest {
     private CategoryMapper categoryMapper;
 
     @Mock
-    private TagMapper tagMapper;
-
-    @Mock
     private ArticleTagRelMapper articleTagRelMapper;
 
     @Mock
@@ -53,11 +51,13 @@ public class ArticleServiceTest {
     @Mock
     private CounterService counterService;
 
+    @Mock
+    private ArticleCacheService articleCacheService;
+
     @InjectMocks
     private ArticleService articleService;
 
     private Category mockCategory;
-    private Tag mockTag;
 
     @BeforeEach
     void setUp() {
@@ -67,10 +67,6 @@ public class ArticleServiceTest {
                 .slug("backend")
                 .build();
 
-        mockTag = Tag.builder()
-                .id(10L)
-                .name("Java")
-                .build();
     }
 
     @Test
@@ -97,8 +93,8 @@ public class ArticleServiceTest {
         ArticleCreateResponse response = articleService.createArticle(request, 888L);
 
         assertNotNull(response);
-        assertEquals(1001L, response.getId());
-        assertEquals(ArticleStatus.PUBLISHED, response.getStatus());
+        assertEquals(1001L, response.id());
+        assertEquals(ArticleStatus.PUBLISHED, response.status());
 
         ArgumentCaptor<Article> articleCaptor = ArgumentCaptor.forClass(Article.class);
         verify(articleMapper, times(1)).insert(articleCaptor.capture());
@@ -135,7 +131,7 @@ public class ArticleServiceTest {
         ArticleCreateResponse response = articleService.createArticle(request, 888L);
 
         assertNotNull(response);
-        assertEquals(ArticleStatus.DRAFT, response.getStatus());
+        assertEquals(ArticleStatus.DRAFT, response.status());
 
         ArgumentCaptor<Article> captor = ArgumentCaptor.forClass(Article.class);
         verify(articleMapper).insert(captor.capture());
@@ -179,10 +175,11 @@ public class ArticleServiceTest {
         ArticlePatchResponse response = articleService.updateArticle(1001L, patch, 888L);
 
         assertNotNull(response);
-        assertEquals(1001L, response.getId());
-        assertEquals(ArticleStatus.PUBLISHED, response.getStatus());
+        assertEquals(1001L, response.id());
+        assertEquals(ArticleStatus.PUBLISHED, response.status());
 
         verify(articleMapper, times(1)).updateById(existing);
+        verify(articleCacheService, times(1)).evictCache(1001L);
         assertEquals("新标题", existing.getTitle());
         assertEquals(ArticleStatus.PUBLISHED, existing.getStatus());
         assertNotNull(existing.getPublishTime());
@@ -207,9 +204,9 @@ public class ArticleServiceTest {
     }
 
     @Test
-    @DisplayName("测试虚拟线程并发获取文章详情：聚合正文、TOC、标签、16B SDS 计数与位图状态")
+    @DisplayName("测试从多级缓存与虚拟线程并发获取文章详情：聚合静态元数据、16B SDS 计数与位图状态")
     void testGetDetail_Success() {
-        Article article = Article.builder()
+        ArticleDetailStatic staticDto = ArticleDetailStatic.builder()
                 .id(1001L)
                 .authorId(888L)
                 .categoryId(1L)
@@ -218,10 +215,10 @@ public class ArticleServiceTest {
                 .contentMd("# 标题\n\n正文内容")
                 .wordCount(500)
                 .readTimeMinutes(2)
-                .status(ArticleStatus.PUBLISHED)
+                .tags(List.of(new TagResponse(10L, "Java")))
                 .build();
 
-        when(articleMapper.selectById(1001L)).thenReturn(article);
+        when(articleCacheService.getStaticDetail(1001L)).thenReturn(staticDto);
         when(counterService.getCounts(eq(CounterSchema.EntityType.ARTICLE), eq("1001")))
                 .thenReturn(Map.of(
                         CounterSchema.ArticleMetric.VIEWS, 1500L,
@@ -233,10 +230,6 @@ public class ArticleServiceTest {
                 .thenReturn(true);
         when(counterService.isSet(eq(CounterSchema.EntityType.ARTICLE), eq("1001"), eq(CounterSchema.ArticleMetric.FAVORITE), eq(100L)))
                 .thenReturn(false);
-
-        ArticleTagRel rel = ArticleTagRel.builder().articleId(1001L).tagId(10L).build();
-        when(articleTagRelMapper.selectList(any())).thenReturn(List.of(rel));
-        when(tagMapper.selectByIds(any())).thenReturn(List.of(mockTag));
 
         ArticleDetailResponse response = articleService.getDetail(1001L, 100L);
 
@@ -252,13 +245,13 @@ public class ArticleServiceTest {
         assertFalse(response.getIsFavorited());
         assertNotNull(response.getTags());
         assertEquals(1, response.getTags().size());
-        assertEquals("Java", response.getTags().getFirst().getName());
+        assertEquals("Java", response.getTags().getFirst().name());
     }
 
     @Test
     @DisplayName("测试获取文章详情文章不存在或已被删除抛出 404")
     void testGetDetail_NotFound() {
-        when(articleMapper.selectById(999L)).thenReturn(null);
+        when(articleCacheService.getStaticDetail(999L)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> articleService.getDetail(999L, 100L));

@@ -1,27 +1,35 @@
 package com.codesight.profile.service;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import com.codesight.profile.api.dto.AuthorCardResponse;
+import com.codesight.profile.model.AuthorCardStatic;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.storage.service.StorageService;
 import com.codesight.user.User;
 import com.codesight.user.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * 个人资料业务服务类
  * <p>
  * 处理用户个人资料的查询、局部字段更新、头像上传以及创作者名片多源聚合等核心业务。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
@@ -29,6 +37,7 @@ public class ProfileService {
     private final UserService userService;
     private final StorageService storageService;
     private final CounterService counterService;
+    private final ProfileCacheService profileCacheService;
 
     /**
      * 更新个人资料（支持局部字段 PATCH 更新）
@@ -49,6 +58,7 @@ public class ProfileService {
         }
 
         userService.updateById(request.toEntity(userId));
+        profileCacheService.evictCache(userId);
 
         User updated = userService.getById(userId);
         return ProfileResponse.from(updated);
@@ -80,6 +90,7 @@ public class ProfileService {
         patch.setId(userId);
         patch.setAvatar(avatarUrl);
         userService.updateById(patch);
+        profileCacheService.evictCache(userId);
 
         User updated = userService.getById(userId);
         return ProfileResponse.from(updated);
@@ -107,42 +118,57 @@ public class ProfileService {
      * @return 创作者名片响应体
      */
     public AuthorCardResponse getAuthorCard(Long authorId, Long currentUserId) {
-        User author = userService.getById(authorId);
-        if (author == null) {
-            throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "作者不存在或已被删除");
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            // 1. 异步获取创作者静态名片资料
+            Future<AuthorCardStatic> staticFuture = executor.submit(() ->
+                    profileCacheService.getStaticCard(authorId)
+            );
+
+            // 2. 异步获取实时计数
+            Future<Map<CounterSchema.MetricItem, Long>> countsFuture = executor.submit(() ->
+                    counterService.getCounts(CounterSchema.EntityType.USER, String.valueOf(authorId))
+            );
+
+            // 3. 异步获取关注状态
+            Future<Boolean> isFollowedFuture = executor.submit(() ->
+                    currentUserId != null && counterService.isSet(
+                            CounterSchema.EntityType.USER,
+                            String.valueOf(authorId),
+                            CounterSchema.UserMetric.FOLLOWERS,
+                            currentUserId
+                    )
+            );
+
+            AuthorCardStatic staticDto = staticFuture.get();
+            if (staticDto == null) {
+                throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "作者不存在或已被删除");
+            }
+
+            Map<CounterSchema.MetricItem, Long> counts = countsFuture.get();
+            Boolean isFollowed = isFollowedFuture.get();
+
+            long viewsReceived = counts.getOrDefault(CounterSchema.UserMetric.VIEWS_RECEIVED, 0L);
+            long likesReceived = counts.getOrDefault(CounterSchema.UserMetric.LIKES_RECEIVED, 0L);
+            long followerCount = counts.getOrDefault(CounterSchema.UserMetric.FOLLOWERS, 0L);
+            long followingCount = counts.getOrDefault(CounterSchema.UserMetric.FOLLOWINGS, 0L);
+
+            AuthorCardResponse authorCardResponse = new AuthorCardResponse();
+            BeanUtil.copyProperties(staticDto, authorCardResponse);
+
+            authorCardResponse.setViewsReceived(viewsReceived);
+            authorCardResponse.setLikesReceived(likesReceived);
+            authorCardResponse.setFollowerCount(followerCount);
+            authorCardResponse.setFollowingCount(followingCount);
+            authorCardResponse.setFollowed(Boolean.TRUE.equals(isFollowed));
+
+            return authorCardResponse;
+
+        } catch (InterruptedException | ExecutionException e) {
+            if (e.getCause() instanceof BusinessException be) {
+                throw be;
+            }
+            log.error("获取创作者名片并发聚合失败: authorId={}", authorId, e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "获取创作者名片失败");
         }
-
-        // 1. 读取 16B SDS 紧凑计数快照
-        Map<CounterSchema.MetricItem, Long> counts = counterService.getCounts(
-                CounterSchema.EntityType.USER,
-                String.valueOf(authorId)
-        );
-
-        long viewsReceived = counts.getOrDefault(CounterSchema.UserMetric.VIEWS_RECEIVED, 0L);
-        long likesReceived = counts.getOrDefault(CounterSchema.UserMetric.LIKES_RECEIVED, 0L);
-        long followerCount = counts.getOrDefault(CounterSchema.UserMetric.FOLLOWERS, 0L);
-        long followingCount = counts.getOrDefault(CounterSchema.UserMetric.FOLLOWINGS, 0L);
-
-        // 2. 判定当前登录用户是否已关注该作者（4KB 分片位图）
-        boolean isFollowed = currentUserId != null && counterService.isSet(
-                        CounterSchema.EntityType.USER,
-                        String.valueOf(authorId),
-                        CounterSchema.UserMetric.FOLLOWERS,
-                        currentUserId
-                );
-
-        return new AuthorCardResponse(
-                author.getId(),
-                author.getNickname(),
-                author.getAvatar(),
-                author.getBio(),
-                author.getJobTitle(),
-                author.getCompany(),
-                viewsReceived,
-                likesReceived,
-                followerCount,
-                followingCount,
-                isFollowed
-        );
     }
 }
