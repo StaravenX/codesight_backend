@@ -28,3 +28,15 @@ spring:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+
+app:
+  cache:
+    caffeine:
+      article-detail:
+        initial-capacity: 100
+        max-size: 10000
+        ttl-seconds: 300
+      author-card:
+        initial-capacity: 100
+        max-size: 5000
+        ttl-seconds: 300

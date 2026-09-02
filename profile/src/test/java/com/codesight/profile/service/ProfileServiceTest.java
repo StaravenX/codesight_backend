@@ -4,6 +4,7 @@ import com.codesight.common.exception.BusinessException;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import com.codesight.profile.api.dto.AuthorCardResponse;
+import com.codesight.profile.model.AuthorCardStatic;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.storage.service.StorageService;
@@ -38,6 +39,9 @@ class ProfileServiceTest {
 
     @Mock
     private CounterService counterService;
+
+    @Mock
+    private ProfileCacheService profileCacheService;
 
     @InjectMocks
     private ProfileService profileService;
@@ -75,6 +79,7 @@ class ProfileServiceTest {
 
         assertNotNull(response);
         verify(userService).updateById(any(User.class));
+        verify(profileCacheService).evictCache(1L);
     }
 
     @Test
@@ -112,6 +117,7 @@ class ProfileServiceTest {
         assertNotNull(response);
         verify(storageService).uploadFile(anyString(), eq(file));
         verify(userService).updateById(any(User.class));
+        verify(profileCacheService).evictCache(1L);
     }
 
     @Test
@@ -144,7 +150,16 @@ class ProfileServiceTest {
 
     @Test
     void getAuthorCard_Success_WithFollowStatus() {
-        when(userService.getById(1L)).thenReturn(existingUser);
+        AuthorCardStatic staticDto = AuthorCardStatic.builder()
+                .id(1L)
+                .nickname("原昵称")
+                .avatar("old_avatar.png")
+                .bio("原简介")
+                .jobTitle("工程师")
+                .company("原公司")
+                .build();
+
+        when(profileCacheService.getStaticCard(1L)).thenReturn(staticDto);
         when(counterService.getCounts(eq(CounterSchema.EntityType.USER), eq("1")))
                 .thenReturn(Map.of(
                         CounterSchema.UserMetric.VIEWS_RECEIVED, 1200L,
@@ -158,19 +173,19 @@ class ProfileServiceTest {
         AuthorCardResponse card = profileService.getAuthorCard(1L, 2L);
 
         assertNotNull(card);
-        assertEquals(1L, card.id());
-        assertEquals("原昵称", card.nickname());
-        assertEquals("old_avatar.png", card.avatar());
-        assertEquals(1200L, card.viewsReceived());
-        assertEquals(350L, card.likesReceived());
-        assertEquals(88L, card.followerCount());
-        assertEquals(32L, card.followingCount());
+        assertEquals(1L, card.getId());
+        assertEquals("原昵称", card.getNickname());
+        assertEquals("old_avatar.png", card.getAvatar());
+        assertEquals(1200L, card.getViewsReceived());
+        assertEquals(350L, card.getLikesReceived());
+        assertEquals(88L, card.getFollowerCount());
+        assertEquals(32L, card.getFollowingCount());
         assertTrue(card.isFollowed());
     }
 
     @Test
     void getAuthorCard_AuthorNotFound_ShouldThrowException() {
-        when(userService.getById(999L)).thenReturn(null);
+        when(profileCacheService.getStaticCard(999L)).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> profileService.getAuthorCard(999L, null));
     }
