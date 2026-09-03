@@ -40,3 +40,7 @@ app:
         initial-capacity: 100
         max-size: 5000
         ttl-seconds: 300
+      category:
+        initial-capacity: 10
+        max-size: 500
+        ttl-seconds: 600
