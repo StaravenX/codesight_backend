@@ -123,6 +123,24 @@ class CounterServiceTest {
     }
 
     @Test
+    @DisplayName("测试 batchIsSet：管道化批量查询多实体激活状态")
+    void testBatchIsSet() {
+        when(stringRedisTemplate.executePipelined(any(RedisCallback.class)))
+                .thenReturn(Arrays.asList(true, false));
+
+        Map<String, Boolean> res = counterService.batchIsSet(
+                CounterSchema.EntityType.ARTICLE,
+                Arrays.asList("1001", "1002"),
+                CounterSchema.ArticleMetric.LIKE,
+                15L
+        );
+
+        assertEquals(2, res.size());
+        assertTrue(res.get("1001"));
+        assertFalse(res.get("1002"));
+    }
+
+    @Test
     @DisplayName("测试 increase：纯标量增量投递与 delta=0 忽略")
     void testIncrease() {
         // 增量正常投递

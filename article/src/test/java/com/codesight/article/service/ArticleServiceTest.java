@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,6 +51,9 @@ public class ArticleServiceTest {
 
     @Mock
     private ArticleCacheService articleCacheService;
+
+    @Mock
+    private RecommendRankService recommendRankService;
 
     @InjectMocks
     private ArticleService articleService;
@@ -114,6 +115,7 @@ public class ArticleServiceTest {
         assertNotNull(saved.getPublishTime());
 
         verify(articleTagRelMapper, times(1)).insert(any(ArticleTagRel.class));
+        verify(recommendRankService, times(1)).addOrIncrScore(eq(1001L), eq(0.0));
     }
 
     @Test
@@ -137,6 +139,7 @@ public class ArticleServiceTest {
         verify(articleMapper).insert(captor.capture());
         assertEquals(ArticleStatus.DRAFT, captor.getValue().getStatus());
         assertNull(captor.getValue().getPublishTime());
+        verify(recommendRankService, never()).addOrIncrScore(any(), anyDouble());
     }
 
     @Test
@@ -180,6 +183,7 @@ public class ArticleServiceTest {
 
         verify(articleMapper, times(1)).updateById(existing);
         verify(articleCacheService, times(1)).evictCache(1001L);
+        verify(recommendRankService, times(1)).addOrIncrScore(eq(1001L), eq(0.0));
         assertEquals("新标题", existing.getTitle());
         assertEquals(ArticleStatus.PUBLISHED, existing.getStatus());
         assertNotNull(existing.getPublishTime());
