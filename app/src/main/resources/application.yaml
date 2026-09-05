@@ -26,6 +26,7 @@ spring:
     virtual:
       enabled: true
 mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
 

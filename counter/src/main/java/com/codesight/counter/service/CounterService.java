@@ -104,6 +104,39 @@ public class CounterService {
     }
 
     /**
+     * 管道化批量查询用户对多个实体的状态是否激活
+     *
+     * @param entityType 业务实体类型
+     * @param entityIds  业务实体 ID 列表
+     * @param metric     指标契约（如 ArticleMetric.LIKE）
+     * @param userId     当前登录用户 ID
+     * @return 实体 ID -> 是否激活 Map
+     */
+    public Map<String, Boolean> batchIsSet(CounterSchema.EntityType entityType, List<String> entityIds, CounterSchema.MetricItem metric, long userId) {
+        if (entityIds == null || entityIds.isEmpty() || userId <= 0) {
+            return Collections.emptyMap();
+        }
+
+        long chunk = BitmapShard.chunkOf(userId);
+        long bit = BitmapShard.bitOf(userId);
+
+        List<Object> results = stringRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String entityId : entityIds) {
+                String bmKey = CounterKeys.bitmapKey(entityType, entityId, metric.getCode(), chunk);
+                connection.stringCommands().getBit(bmKey.getBytes(StandardCharsets.UTF_8), bit);
+            }
+            return null;
+        });
+
+        Map<String, Boolean> isSetMap = new HashMap<>(entityIds.size());
+        for (int i = 0; i < entityIds.size(); i++) {
+            Object res = i < results.size() ? results.get(i) : null;
+            isSetMap.put(entityIds.get(i), Boolean.TRUE.equals(res));
+        }
+        return isSetMap;
+    }
+
+    /**
      * 管道化扫描并统计指定实体与指标的所有 4KB 分片位图总数（BITCOUNT）
      *
      * @param entityType 业务实体类型（如 ARTICLE, USER）

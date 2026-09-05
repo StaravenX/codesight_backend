@@ -100,6 +100,12 @@ public class Article {
     private Long favoriteCount = 0L;
 
     /**
+     * 综合推荐排序分
+     */
+    @Builder.Default
+    private Double rankScore = 0.0;
+
+    /**
      * 创作者主页是否置顶：true=置顶，false=正常
      */
     private Boolean isTop;

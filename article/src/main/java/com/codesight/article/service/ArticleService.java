@@ -45,6 +45,7 @@ public class ArticleService {
     private final CategoryTagRelMapper categoryTagRelMapper;
     private final CounterService counterService;
     private final ArticleCacheService articleCacheService;
+    private final RecommendRankService recommendRankService;
 
     @Transactional(rollbackFor = Exception.class)
     public ArticleCreateResponse createArticle(ArticleCreateRequest request, Long authorId) {
@@ -95,6 +96,11 @@ public class ArticleService {
 
         // 6. 保存标签多对多关联关系
         saveArticleTags(articleId, request.tagIds());
+
+        // 7. 若公开发布，加入推荐候选池
+        if (status == ArticleStatus.PUBLISHED && article.getVisible() == ArticleVisible.PUBLIC) {
+            recommendRankService.addOrIncrScore(articleId, 0.0);
+        }
 
         log.info("文章创建成功: articleId={}, authorId={}, status={}", articleId, authorId, status);
 
@@ -160,6 +166,9 @@ public class ArticleService {
         if (request.status() != null) {
             if (article.getStatus() == ArticleStatus.DRAFT && request.status() == ArticleStatus.PUBLISHED) {
                 article.setPublishTime(Instant.now());
+                recommendRankService.addOrIncrScore(articleId, 0.0);
+            } else if (request.status() == ArticleStatus.OFFLINE || request.status() == ArticleStatus.DELETED) {
+                recommendRankService.removeArticle(articleId);
             }
             article.setStatus(request.status());
         }

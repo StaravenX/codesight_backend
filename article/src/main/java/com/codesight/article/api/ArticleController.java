@@ -1,10 +1,14 @@
 package com.codesight.article.api;
 
 import com.codesight.article.api.dto.request.ArticleCreateRequest;
+import com.codesight.article.api.dto.request.ArticleFeedRequest;
 import com.codesight.article.api.dto.request.ArticlePatchRequest;
 import com.codesight.article.api.dto.response.ArticleCreateResponse;
 import com.codesight.article.api.dto.response.ArticleDetailResponse;
+import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
+import com.codesight.article.api.dto.response.ArticleFeedPageResponse;
 import com.codesight.article.api.dto.response.ArticlePatchResponse;
+import com.codesight.article.service.ArticleFeedService;
 import com.codesight.article.service.ArticleService;
 import com.codesight.common.annotation.CurrentUserId;
 import com.codesight.common.annotation.RateLimit;
@@ -17,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 文章管理控制器
  */
@@ -28,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 public class ArticleController {
 
     private final ArticleService articleService;
+    private final ArticleFeedService articleFeedService;
 
     /**
      * 创建文章或保存草稿
@@ -78,4 +85,37 @@ public class ArticleController {
             ) {
         return articleService.getDetail(id, userId);
     }
+
+    /**
+     * 获取文章信息流
+     *
+     * @param request 分页筛选参数
+     * @param userId  当前登录用户 ID（可选）
+     * @return 信息流分页数据
+     */
+    @GetMapping("/feed")
+    @Operation(summary = "获取文章信息流", description = "支持最新与推荐排序、分类频道、标签聚合过滤以及游标分页")
+    @RateLimit(windowSeconds = 60, maxRequests = 300)
+    public ArticleFeedPageResponse getFeed(
+            @Valid @ModelAttribute ArticleFeedRequest request,
+            @CurrentUserId(required = false) Long userId) {
+        return articleFeedService.getFeed(request, userId);
+    }
+
+    /**
+     * 获取文章详情页底部相关推荐
+     *
+     * @param id     当前文章 ID
+     * @param userId 当前登录用户 ID（可选）
+     * @return 相关文章推荐列表（Top-5）
+     */
+    @GetMapping("/{id}/related")
+    @Operation(summary = "获取文章相关推荐", description = "智能匹配同标签与同分类技术文章，并实时装配计数与互动状态")
+    @RateLimit(windowSeconds = 60, maxRequests = 300)
+    public List<ArticleFeedItemResponse> getRelated(
+            @PathVariable("id") Long id,
+            @CurrentUserId(required = false) Long userId) {
+        return articleFeedService.listRelatedArticles(id, userId);
+    }
 }
+

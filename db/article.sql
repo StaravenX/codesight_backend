@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS articles (
     like_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '点赞量统计',
     comment_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '评论量统计',
     favorite_count BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '收藏量统计',
+    rank_score DOUBLE NOT NULL DEFAULT 0 COMMENT '综合推荐排序分',
     is_top TINYINT(1) NOT NULL DEFAULT 0 COMMENT '创作者主页是否置顶：1=置顶，0=正常',
     visible VARCHAR(32) NOT NULL DEFAULT 'public' COMMENT '可见性：public=公开，private=仅自己可见',
     status VARCHAR(16) NOT NULL DEFAULT 'draft' COMMENT '文章状态：draft=草稿，published=已发布，offline=已下架，deleted=已删除',
@@ -55,6 +56,8 @@ CREATE TABLE IF NOT EXISTS articles (
     KEY ix_articles_category_pub (category_id, status, publish_time),
     KEY ix_articles_author_pub (author_id, status, is_top, publish_time),
     KEY ix_articles_status_pub (status, publish_time),
+    KEY ix_articles_recommend (status, rank_score, id),
+    KEY ix_articles_category_rank (category_id, status, rank_score, id),
     CONSTRAINT fk_articles_author FOREIGN KEY (author_id) REFERENCES users(id),
     CONSTRAINT fk_articles_category FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章核心主表';
