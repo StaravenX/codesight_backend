@@ -34,7 +34,7 @@ public class RecommendRankService {
     public RecommendRankService(StringRedisTemplate redis) {
         this.redis = redis;
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
-        script.setLocation(new ClassPathResource("lua/decay.lua"));
+        script.setLocation(new ClassPathResource("lua/decay_script.lua"));
         this.decayScript = script;
     }
 
