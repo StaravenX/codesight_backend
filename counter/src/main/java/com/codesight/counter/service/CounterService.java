@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -47,7 +48,7 @@ public class CounterService {
             @Qualifier("toggleBitScript") RedisScript<Long> toggleBitScript,
             CounterEventProducer eventProducer,
             RedissonClient redisson,
-            List<CounterRebuilder> rebuilders) {
+            @Lazy List<CounterRebuilder> rebuilders) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.toggleBitScript = toggleBitScript;
         this.eventProducer = eventProducer;
@@ -311,7 +312,7 @@ public class CounterService {
 
                 // 清理 Hash 聚合桶中的对应字段，防止重复加算
                 String aggKey = CounterKeys.aggKey(entityType, entityId);
-                stringRedisTemplate.opsForHash().delete(aggKey, m.getIndex());
+                stringRedisTemplate.opsForHash().delete(aggKey, String.valueOf(m.getIndex()));
             }
 
             // 回填 16 字节 SDS 快照

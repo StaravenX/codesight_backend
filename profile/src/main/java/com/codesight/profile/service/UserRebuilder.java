@@ -7,7 +7,7 @@ import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.counter.schema.CounterRebuilder;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -18,11 +18,15 @@ import java.util.Map;
  * 用户维度重建
  */
 @Service
-@RequiredArgsConstructor
 public class UserRebuilder implements CounterRebuilder {
 
     private final CounterService counterService;
     private final ArticleMapper articleMapper;
+
+    public UserRebuilder(@Lazy CounterService counterService, ArticleMapper articleMapper) {
+        this.counterService = counterService;
+        this.articleMapper = articleMapper;
+    }
 
     @Override
     public CounterSchema.EntityType entityType() {

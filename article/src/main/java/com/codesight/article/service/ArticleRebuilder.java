@@ -5,8 +5,8 @@ import com.codesight.article.model.entity.Article;
 import com.codesight.counter.schema.CounterRebuilder;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -17,11 +17,15 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ArticleRebuilder implements CounterRebuilder {
 
     private final CounterService counterService;
     private final ArticleMapper articleMapper;
+
+    public ArticleRebuilder(@Lazy CounterService counterService, ArticleMapper articleMapper) {
+        this.counterService = counterService;
+        this.articleMapper = articleMapper;
+    }
 
     @Override
     public CounterSchema.EntityType entityType() {
