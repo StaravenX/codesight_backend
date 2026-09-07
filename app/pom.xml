@@ -53,6 +53,12 @@
             <groupId>com.codesight</groupId>
             <artifactId>article</artifactId>
         </dependency>
+
+        <!-- relation -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>relation</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

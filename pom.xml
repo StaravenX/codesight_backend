@@ -24,6 +24,7 @@
         <module>profile</module>
         <module>counter</module>
         <module>article</module>
+        <module>relation</module>
     </modules>
 
     <properties>
@@ -73,6 +74,11 @@
             <dependency>
                 <groupId>com.codesight</groupId>
                 <artifactId>article</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codesight</groupId>
+                <artifactId>relation</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -145,6 +151,18 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
