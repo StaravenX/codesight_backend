@@ -7,9 +7,9 @@
         <artifactId>codesight_backend</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>profile</artifactId>
-    <name>profile</name>
-    <description>profile</description>
+    <artifactId>relation</artifactId>
+    <name>relation</name>
+    <description>relation</description>
 
     <dependencies>
         <!-- Common -->
@@ -18,35 +18,18 @@
             <artifactId>common</artifactId>
         </dependency>
 
-        <!-- User -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>user</artifactId>
-        </dependency>
-
-        <!-- Storage -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>storage</artifactId>
-        </dependency>
-
         <!-- Counter -->
         <dependency>
             <groupId>com.codesight</groupId>
             <artifactId>counter</artifactId>
         </dependency>
 
-        <!-- Article -->
+        <!-- MyBatis-Plus -->
         <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>article</artifactId>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
-        <!-- Relation -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>relation</artifactId>
-        </dependency>
     </dependencies>
 
 </project>

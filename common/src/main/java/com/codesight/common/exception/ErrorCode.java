@@ -25,6 +25,8 @@ public enum ErrorCode {
     CATEGORY_NOT_FOUND("CATEGORY_NOT_FOUND", "所选技术分类不存在", 404),
     ARTICLE_NOT_FOUND("ARTICLE_NOT_FOUND", "文章不存在或已被删除", 404),
     ARTICLE_FORBIDDEN("ARTICLE_FORBIDDEN", "无权修改他人文章", 403),
+    CANNOT_FOLLOW_SELF("CANNOT_FOLLOW_SELF", "不能关注自己", 400),
+    FOLLOW_LIMIT_EXCEEDED("FOLLOW_LIMIT_EXCEEDED", "关注人数已达上限", 400),
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "服务器内部错误", 500);
 
     final String code;
