@@ -7,6 +7,10 @@ import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.counter.schema.CounterRebuilder;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
+import com.codesight.relation.mapper.UserFollowerMapper;
+import com.codesight.relation.mapper.UserFollowingMapper;
+import com.codesight.relation.model.UserFollower;
+import com.codesight.relation.model.UserFollowing;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -22,10 +26,17 @@ public class UserRebuilder implements CounterRebuilder {
 
     private final CounterService counterService;
     private final ArticleMapper articleMapper;
+    private final UserFollowerMapper userFollowerMapper;
+    private final UserFollowingMapper userFollowingMapper;
 
-    public UserRebuilder(@Lazy CounterService counterService, ArticleMapper articleMapper) {
+    public UserRebuilder(@Lazy CounterService counterService,
+                         ArticleMapper articleMapper,
+                         UserFollowerMapper userFollowerMapper,
+                         UserFollowingMapper userFollowingMapper) {
         this.counterService = counterService;
         this.articleMapper = articleMapper;
+        this.userFollowerMapper = userFollowerMapper;
+        this.userFollowingMapper = userFollowingMapper;
     }
 
     @Override
@@ -38,16 +49,24 @@ public class UserRebuilder implements CounterRebuilder {
         Map<CounterSchema.MetricItem, Long> resultMap = new HashMap<>();
         Long authorIdVal = Long.parseLong(authorId);
 
-        // 1. 粉丝数真值：从 4KB 分片位图统计 TODO: 用户关系模块完成后补充 MySQL兜底
+        // 1. 粉丝数真值：优先从 4KB 分片位图统计，位图缺失时走 MySQL user_follower 兜底
         long followersCount = counterService.bitCountShards(this.entityType(), authorId, CounterSchema.UserMetric.FOLLOWERS);
         if (followersCount < 0) {
-            followersCount = 0L;
+            Long count = userFollowerMapper.selectCount(
+                    new LambdaQueryWrapper<UserFollower>()
+                            .eq(UserFollower::getToUserId, authorIdVal)
+            );
+            followersCount = (count != null ? count : 0L);
         }
 
-        // 2. 关注数真值：从 4KB 分片位图统计 TODO: 用户关系模块完成后补充 MySQL兜底
+        // 2. 关注数真值：优先从 4KB 分片位图统计，位图缺失时走 MySQL user_following 兜底
         long followingsCount = counterService.bitCountShards(this.entityType(), authorId, CounterSchema.UserMetric.FOLLOWINGS);
         if (followingsCount < 0) {
-            followingsCount = 0L;
+            Long count = userFollowingMapper.selectCount(
+                    new LambdaQueryWrapper<UserFollowing>()
+                            .eq(UserFollowing::getFromUserId, authorIdVal)
+            );
+            followingsCount = (count != null ? count : 0L);
         }
 
         // 3. 总阅读量 + 获得总点赞量：从 articles 表汇总
