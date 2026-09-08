@@ -9,7 +9,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
-import java.time.LocalDate;
 
 @Data
 @Builder
@@ -17,7 +16,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @TableName("users")
 public class User {
-    
+
     @TableId(type = IdType.AUTO)
     private Long id;
 
@@ -35,15 +34,15 @@ public class User {
 
     private String csId;
 
-    private String gender;
-
-    private LocalDate birthday;
-
-    private String company;
+    private String jobDirection;
 
     private String jobTitle;
 
-    private String school;
+    private String company;
+
+    private String workDate;
+
+    private String homePage;
 
     private String interestedDomains;
 
