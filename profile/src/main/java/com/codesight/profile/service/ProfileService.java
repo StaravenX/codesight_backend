@@ -6,12 +6,13 @@ import com.codesight.common.exception.ErrorCode;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import com.codesight.profile.api.dto.AuthorCardResponse;
-import com.codesight.profile.model.AuthorCardStatic;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.storage.service.StorageService;
 import com.codesight.user.User;
 import com.codesight.user.UserService;
+import com.codesight.user.UserBaseInfo;
+import com.codesight.user.UserCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,7 @@ public class ProfileService {
     private final UserService userService;
     private final StorageService storageService;
     private final CounterService counterService;
-    private final ProfileCacheService profileCacheService;
+    private final UserCacheService userCacheService;
 
     /**
      * 更新个人资料（支持局部字段 PATCH 更新）
@@ -58,7 +59,7 @@ public class ProfileService {
         }
 
         userService.updateById(request.toEntity(userId));
-        profileCacheService.evictCache(userId);
+        userCacheService.evictUser(userId);
 
         User updated = userService.getById(userId);
         return ProfileResponse.from(updated);
@@ -90,7 +91,7 @@ public class ProfileService {
         patch.setId(userId);
         patch.setAvatar(avatarUrl);
         userService.updateById(patch);
-        profileCacheService.evictCache(userId);
+        userCacheService.evictUser(userId);
 
         User updated = userService.getById(userId);
         return ProfileResponse.from(updated);
@@ -120,8 +121,8 @@ public class ProfileService {
     public AuthorCardResponse getAuthorCard(Long authorId, Long currentUserId) {
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             // 1. 异步获取创作者静态名片资料
-            Future<AuthorCardStatic> staticFuture = executor.submit(() ->
-                    profileCacheService.getStaticCard(authorId)
+            Future<UserBaseInfo> staticFuture = executor.submit(() ->
+                    userCacheService.getUserBaseInfo(authorId)
             );
 
             // 2. 异步获取实时计数
@@ -139,7 +140,7 @@ public class ProfileService {
                     )
             );
 
-            AuthorCardStatic staticDto = staticFuture.get();
+            UserBaseInfo staticDto = staticFuture.get();
             if (staticDto == null) {
                 throw new BusinessException(ErrorCode.IDENTIFIER_NOT_FOUND, "作者不存在或已被删除");
             }

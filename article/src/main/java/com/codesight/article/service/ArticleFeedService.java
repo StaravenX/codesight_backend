@@ -17,8 +17,8 @@ import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
-import com.codesight.user.User;
-import com.codesight.user.UserService;
+import com.codesight.user.UserBaseInfo;
+import com.codesight.user.UserCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,7 +45,7 @@ public class ArticleFeedService {
     private final ArticleMapper articleMapper;
     private final ArticleTagRelMapper articleTagRelMapper;
     private final TagMapper tagMapper;
-    private final UserService userService;
+    private final UserCacheService userCacheService;
     private final CounterService counterService;
     private final RecommendRankService recommendRankService;
 
@@ -210,13 +210,9 @@ public class ArticleFeedService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<Long, User> authorMap = Collections.emptyMap();
-        if (!authorIds.isEmpty()) {
-            List<User> users = userService.listByIds(authorIds);
-            if (users != null) {
-                authorMap = users.stream().collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
-            }
-        }
+        Map<Long, UserBaseInfo> authorMap = !authorIds.isEmpty()
+                ? userCacheService.batchGetUserBaseInfo(authorIds)
+                : Collections.emptyMap();
 
         // 2. 批量标签多对多装配
         List<Long> articleIds = articles.stream().map(Article::getId).toList();
@@ -244,7 +240,7 @@ public class ArticleFeedService {
         List<ArticleFeedItemResponse> items = new ArrayList<>(articles.size());
         for (Article a : articles) {
             String strId = String.valueOf(a.getId());
-            User author = authorMap.get(a.getAuthorId());
+            UserBaseInfo author = authorMap.get(a.getAuthorId());
             Map<CounterSchema.MetricItem, Long> counts = countsMap.getOrDefault(strId, Collections.emptyMap());
 
             long viewCount = counts.getOrDefault(CounterSchema.ArticleMetric.VIEWS, a.getViewCount() != null ? a.getViewCount() : 0L);
@@ -259,7 +255,7 @@ public class ArticleFeedService {
                     .summary(a.getSummary())
                     .coverUrl(a.getCoverUrl())
                     .authorId(a.getAuthorId())
-                    .authorName(author != null ? author.getNickname() : "知识作者")
+                    .authorName(author != null ? author.nickname() : "知识作者")
                     .categoryId(a.getCategoryId())
                     .tags(articleTagsMap.getOrDefault(a.getId(), Collections.emptyList()))
                     .publishTime(a.getPublishTime())
