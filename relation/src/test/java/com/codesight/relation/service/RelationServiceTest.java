@@ -8,11 +8,19 @@ import com.codesight.common.exception.ErrorCode;
 import com.codesight.counter.event.CounterEvent;
 import com.codesight.counter.event.CounterEventProducer;
 import com.codesight.counter.schema.CounterSchema;
+import com.codesight.counter.service.CounterService;
+import com.codesight.relation.api.dto.request.FollowListQueryRequest;
+import com.codesight.relation.api.dto.response.FollowUserItemResponse;
+import com.codesight.relation.api.dto.response.RelationCursorPageResponse;
 import com.codesight.relation.api.dto.response.RelationStatusResponse;
 import com.codesight.relation.mapper.UserFollowerMapper;
 import com.codesight.relation.mapper.UserFollowingMapper;
 import com.codesight.relation.model.UserFollower;
 import com.codesight.relation.model.UserFollowing;
+import com.codesight.relation.util.RelationCursor;
+import com.codesight.user.User;
+import com.codesight.user.UserBaseInfo;
+import com.codesight.user.UserCacheService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +31,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +50,7 @@ class RelationServiceTest {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
         TableInfoHelper.initTableInfo(assistant, UserFollowing.class);
         TableInfoHelper.initTableInfo(assistant, UserFollower.class);
+        TableInfoHelper.initTableInfo(assistant, User.class);
     }
 
     @Mock
@@ -50,7 +60,13 @@ class RelationServiceTest {
     private UserFollowerMapper userFollowerMapper;
 
     @Mock
+    private UserCacheService userCacheService;
+
+    @Mock
     private RelationCacheService relationCacheService;
+
+    @Mock
+    private CounterService counterService;
 
     @Mock
     private CounterEventProducer counterEventProducer;
@@ -217,5 +233,157 @@ class RelationServiceTest {
         // 空列表直接返回空 Map
         Map<Long, Boolean> emptyResult = relationService.batchGetRelationStatus(USER_A, Collections.emptyList());
         assertThat(emptyResult).isEmpty();
+    }
+
+    @Test
+    @DisplayName("关注列表游标分页：第一页且存在更多数据（hasMore=true），正确组装画像、计数与未登录互动态")
+    void testListFollowing_FirstPage_HasMore() {
+        Instant now = Instant.now();
+        UserFollowing r1 = UserFollowing.builder().fromUserId(USER_A).toUserId(1002L).createdTime(now).build();
+        UserFollowing r2 = UserFollowing.builder().fromUserId(USER_A).toUserId(1003L).createdTime(now.minusSeconds(10)).build();
+        UserFollowing r3 = UserFollowing.builder().fromUserId(USER_A).toUserId(1004L).createdTime(now.minusSeconds(20)).build();
+
+        // 请求 limit=2，数据库返回 3 条表示还有更多
+        when(userFollowingMapper.selectList(any())).thenReturn(List.of(r1, r2, r3));
+
+        // Mock 用户基础画像
+        UserBaseInfo u1 = new UserBaseInfo(1002L, "张三", "avatar1.jpg", null, null, null);
+        UserBaseInfo u2 = new UserBaseInfo(1003L, "李四", "avatar2.jpg", null, null, null);
+        when(userCacheService.batchGetUserBaseInfo(any())).thenReturn(Map.of(1002L, u1, 1003L, u2));
+
+        // Mock 计数中台
+        when(counterService.batchGetCounts(eq(CounterSchema.EntityType.USER), any()))
+                .thenReturn(Map.of(
+                        "1002", Map.of(CounterSchema.UserMetric.FOLLOWERS, 88L, CounterSchema.UserMetric.FOLLOWINGS, 10L),
+                        "1003", Map.of(CounterSchema.UserMetric.FOLLOWERS, 12L, CounterSchema.UserMetric.FOLLOWINGS, 50L)
+                ));
+
+        // 未登录态拉取（currentUserId = null）
+        FollowListQueryRequest req1 = FollowListQueryRequest.builder().userId(USER_A).limit(2).build();
+        RelationCursorPageResponse<FollowUserItemResponse> response = relationService.listFollowing(req1, null);
+
+        assertThat(response.hasMore()).isTrue();
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.nextCursor()).isNotNull();
+
+        FollowUserItemResponse item1 = response.items().getFirst();
+        assertThat(item1.userId()).isEqualTo(1002L);
+        assertThat(item1.nickname()).isEqualTo("张三");
+        assertThat(item1.avatar()).isEqualTo("avatar1.jpg");
+        assertThat(item1.followerCount()).isEqualTo(88L);
+        assertThat(item1.followingCount()).isEqualTo(10L);
+        assertThat(item1.followedByMe()).isFalse();
+
+        FollowUserItemResponse item2 = response.items().get(1);
+        assertThat(item2.userId()).isEqualTo(1003L);
+        assertThat(item2.nickname()).isEqualTo("李四");
+
+        // 验证 nextCursor 可以被正确反解回最后一项（r2）的创建时间与 ID
+        RelationCursor.DecodedCursor decoded = RelationCursor.decode(response.nextCursor());
+        assertThat(decoded).isNotNull();
+        assertThat(decoded.createdTime().toEpochMilli()).isEqualTo(r2.getCreatedTime().toEpochMilli());
+        assertThat(decoded.targetUserId()).isEqualTo(1003L);
+    }
+
+    @Test
+    @DisplayName("关注列表游标分页：带游标下一页且最后一页（hasMore=false），正确组装登录用户互动态")
+    void testListFollowing_LastPage_LoggedIn_ShouldAssembleFollowedByMe() {
+        Instant now = Instant.now();
+        String cursor = RelationCursor.encode(now, 1003L);
+
+        UserFollowing r3 = UserFollowing.builder().fromUserId(USER_A).toUserId(1004L).createdTime(now.minusSeconds(20)).build();
+        // 查出来只有 1 条 <= limit(2)，说明没有更多了
+        when(userFollowingMapper.selectList(any())).thenReturn(List.of(r3));
+
+        UserBaseInfo u3 = new UserBaseInfo(1004L, "王五", "avatar3.jpg", null, null, null);
+        when(userCacheService.batchGetUserBaseInfo(any())).thenReturn(Map.of(1004L, u3));
+
+        when(counterService.batchGetCounts(eq(CounterSchema.EntityType.USER), any()))
+                .thenReturn(Map.of("1004", Map.of(CounterSchema.UserMetric.FOLLOWERS, 0L, CounterSchema.UserMetric.FOLLOWINGS, 0L)));
+
+        // 登录态拉取（currentUserId = USER_B），mock 关注状态为 true
+        when(relationCacheService.batchGetRelationStatus(USER_B, List.of(1004L)))
+                .thenReturn(Map.of(1004L, true));
+
+        FollowListQueryRequest req2 = FollowListQueryRequest.builder().userId(USER_A).limit(2).cursor(cursor).build();
+        RelationCursorPageResponse<FollowUserItemResponse> response = relationService.listFollowing(req2, USER_B);
+
+        assertThat(response.hasMore()).isFalse();
+        assertThat(response.nextCursor()).isNull();
+        assertThat(response.items()).hasSize(1);
+
+        FollowUserItemResponse item = response.items().getFirst();
+        assertThat(item.userId()).isEqualTo(1004L);
+        assertThat(item.nickname()).isEqualTo("王五");
+        assertThat(item.followedByMe()).isTrue();
+    }
+
+    @Test
+    @DisplayName("粉丝列表游标分页：查询与组装成功")
+    void testListFollowers_Success() {
+        Instant now = Instant.now();
+        UserFollower f1 = UserFollower.builder().toUserId(USER_A).fromUserId(2001L).createdTime(now).build();
+
+        when(userFollowerMapper.selectList(any())).thenReturn(List.of(f1));
+
+        UserBaseInfo u1 = new UserBaseInfo(2001L, "粉丝小李", "fan.jpg", null, null, null);
+        when(userCacheService.batchGetUserBaseInfo(any())).thenReturn(Map.of(2001L, u1));
+
+        when(counterService.batchGetCounts(eq(CounterSchema.EntityType.USER), any()))
+                .thenReturn(Map.of("2001", Map.of(CounterSchema.UserMetric.FOLLOWERS, 100L, CounterSchema.UserMetric.FOLLOWINGS, 20L)));
+
+        FollowListQueryRequest req3 = FollowListQueryRequest.builder().userId(USER_A).limit(10).build();
+        RelationCursorPageResponse<FollowUserItemResponse> response = relationService.listFollowers(req3, null);
+
+        assertThat(response.hasMore()).isFalse();
+        assertThat(response.items()).hasSize(1);
+        FollowUserItemResponse item = response.items().getFirst();
+        assertThat(item.userId()).isEqualTo(2001L);
+        assertThat(item.nickname()).isEqualTo("粉丝小李");
+        assertThat(item.followerCount()).isEqualTo(100L);
+    }
+
+    @Test
+    @DisplayName("游标编解码工具测试：支持 Base64 与纯时间戳向下兼容")
+    void testRelationCursorUtil() {
+        Instant now = Instant.ofEpochMilli(1731480000000L);
+        Long targetId = 10086L;
+
+        // 1. 标准编码与解码
+        String cursor = RelationCursor.encode(now, targetId);
+        assertThat(cursor).isNotNull();
+
+        RelationCursor.DecodedCursor decoded = RelationCursor.decode(cursor);
+        assertThat(decoded).isNotNull();
+        assertThat(decoded.createdTime()).isEqualTo(now);
+        assertThat(decoded.targetUserId()).isEqualTo(targetId);
+
+        // 2. 兼容纯数字时间戳
+        RelationCursor.DecodedCursor legacy = RelationCursor.decode("1731480000000");
+        assertThat(legacy).isNotNull();
+        assertThat(legacy.createdTime()).isEqualTo(now);
+        assertThat(legacy.targetUserId()).isNull();
+
+        // 3. 空值与非法格式防护
+        assertThat(RelationCursor.decode(null)).isNull();
+        assertThat(RelationCursor.decode("   ")).isNull();
+        assertThat(RelationCursor.decode("invalid-string")).isNull();
+    }
+
+    @Test
+    @DisplayName("关注列表空数据测试：查无数据返回空分页包装")
+    void testListFollowing_EmptyList() {
+        FollowListQueryRequest request = FollowListQueryRequest.builder()
+                .userId(USER_A)
+                .limit(20)
+                .cursor(null)
+                .build();
+
+        when(userFollowingMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        RelationCursorPageResponse<FollowUserItemResponse> response = relationService.listFollowing(request, null);
+        assertThat(response).isNotNull();
+        assertThat(response.items()).isEmpty();
+        assertThat(response.hasMore()).isFalse();
     }
 }

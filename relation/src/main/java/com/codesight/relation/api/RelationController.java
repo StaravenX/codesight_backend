@@ -3,6 +3,9 @@ package com.codesight.relation.api;
 import com.codesight.common.annotation.CurrentUserId;
 import com.codesight.common.annotation.RateLimit;
 import com.codesight.relation.api.dto.request.BatchRelationStatusRequest;
+import com.codesight.relation.api.dto.request.FollowListQueryRequest;
+import com.codesight.relation.api.dto.response.FollowUserItemResponse;
+import com.codesight.relation.api.dto.response.RelationCursorPageResponse;
 import com.codesight.relation.api.dto.response.RelationStatusResponse;
 import com.codesight.relation.service.RelationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -89,5 +92,35 @@ public class RelationController {
             @Valid @RequestBody BatchRelationStatusRequest request,
             @Parameter(hidden = true) @CurrentUserId Long currentUserId) {
         return relationService.batchGetRelationStatus(currentUserId, request.targetUserIds());
+    }
+
+    /**
+     * 游标分页查询指定用户的关注列表
+     *
+     * @param request       列表游标分页请求参数
+     * @param currentUserId 当前登录用户 ID（可为空）
+     * @return 关注用户列表与下一页游标
+     */
+    @GetMapping("/following")
+    @Operation(summary = "查询关注列表", description = "基于 Keyset 游标分页拉取目标用户的关注列表")
+    public RelationCursorPageResponse<FollowUserItemResponse> listFollowing(
+            @Valid FollowListQueryRequest request,
+            @Parameter(hidden = true) @CurrentUserId(required = false) Long currentUserId) {
+        return relationService.listFollowing(request, currentUserId);
+    }
+
+    /**
+     * 游标分页查询指定用户的粉丝列表
+     *
+     * @param request       列表游标分页请求参数
+     * @param currentUserId 当前登录用户 ID（可为空）
+     * @return 粉丝用户列表与下一页游标
+     */
+    @GetMapping("/followers")
+    @Operation(summary = "查询粉丝列表", description = "基于 Keyset 游标分页拉取目标用户的粉丝列表")
+    public RelationCursorPageResponse<FollowUserItemResponse> listFollowers(
+            @Valid FollowListQueryRequest request,
+            @Parameter(hidden = true) @CurrentUserId(required = false) Long currentUserId) {
+        return relationService.listFollowers(request, currentUserId);
     }
 }
