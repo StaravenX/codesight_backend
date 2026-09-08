@@ -11,8 +11,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.time.LocalDate;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,13 +32,13 @@ class ProfileControllerTest {
     @Test
     void patch_ShouldPassUserIdToServiceAndReturnResponse() {
         ProfilePatchRequest request = new ProfilePatchRequest(
-                "新昵称", "新简介", "MALE", LocalDate.of(2000, 1, 1),
-                "测试公司", "架构师", "测试大学", "[\"Java\"]"
+                "新昵称", "移动端开发", "架构师", "测试公司",
+                "2026-02", "https://juejin.cn/user/123", "新简介", "[\"Java\"]"
         );
         ProfileResponse mockResponse = new ProfileResponse(
                 1L, "新昵称", "avatar.png", "新简介", "geek_test",
-                "MALE", LocalDate.of(2000, 1, 1), "测试公司", "架构师",
-                "测试大学", "13800000000", "test@codesight.cn", "[\"Java\"]", null
+                "移动端开发", "架构师", "测试公司", "2026-02",
+                "https://juejin.cn/user/123", "13800000000", "test@codesight.cn", "[\"Java\"]", null
         );
 
         when(profileService.updateProfile(eq(1L), any(ProfilePatchRequest.class))).thenReturn(mockResponse);
@@ -57,7 +55,7 @@ class ProfileControllerTest {
         MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", "test-bytes".getBytes());
         ProfileResponse mockResponse = new ProfileResponse(
                 1L, "name", "https://oss.codesight.cn/avatars/1/test.png", "简介",
-                "geek_user", "MALE", null, null, null, null, null, null, null, null
+                "geek_user", null, null, null, null, null, null, null, null, null
         );
 
         when(profileService.uploadAvatar(eq(1L), eq(file))).thenReturn(mockResponse);
@@ -73,8 +71,8 @@ class ProfileControllerTest {
     void me_ShouldPassUserIdToServiceAndReturnResponse() {
         ProfileResponse mockResponse = new ProfileResponse(
                 1L, "测试用户", "avatar.png", "测试简介", "geek_123",
-                "FEMALE", LocalDate.of(1998, 5, 20), "测试公司", "高级研发",
-                "测试大学", "13900000000", "test@bytedance.com", "[\"Go\",\"Java\"]", null
+                "移动端开发", "高级研发", "测试公司", "2026-02",
+                "https://juejin.cn/user/123", "13900000000", "test@bytedance.com", "[\"Go\",\"Java\"]", null
         );
 
         when(profileService.getProfile(1L)).thenReturn(mockResponse);

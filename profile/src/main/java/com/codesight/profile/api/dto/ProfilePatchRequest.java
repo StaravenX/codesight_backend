@@ -3,10 +3,8 @@ package com.codesight.profile.api.dto;
 import cn.hutool.core.util.StrUtil;
 import com.codesight.user.User;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
 
 /**
  * 个人资料局部更新请求（PATCH）
@@ -20,31 +18,31 @@ public record ProfilePatchRequest(
         @Size(min = 1, max = 64, message = "昵称长度需在 1-64 之间")
         String nickname,
 
-        @Schema(description = "个人简介（不超过512字）")
-        @Size(max = 512, message = "个人描述长度不能超过 512")
-        String bio,
+        @Schema(description = "职业方向（如：移动端开发、前端开发、服务端、人工智能等）")
+        @Size(max = 64, message = "职业方向长度不能超过 64")
+        String jobDirection,
 
-        @Schema(description = "性别（MALE/FEMALE/OTHER/UNKNOWN）")
-        @Pattern(regexp = "(?i)MALE|FEMALE|OTHER|UNKNOWN", message = "性别取值为 MALE/FEMALE/OTHER/UNKNOWN")
-        String gender,
-
-        @Schema(description = "出生日期")
-        @PastOrPresent(message = "生日不能晚于今天")
-        LocalDate birthday,
-
-        @Schema(description = "就职公司")
-        @Size(max = 128, message = "公司名称长度不能超过 128")
-        String company,
-
-        @Schema(description = "职位/头衔")
-        @Size(max = 64, message = "职位长度不能超过 64")
+        @Schema(description = "职位（0-50位）")
+        @Size(max = 50, message = "职位长度不能超过 50")
         String jobTitle,
 
-        @Schema(description = "院校/学校名称")
-        @Size(max = 128, message = "学校名称长度不能超过 128")
-        String school,
+        @Schema(description = "就职公司（0-50位）")
+        @Size(max = 50, message = "公司名称长度不能超过 50")
+        String company,
 
-        @Schema(description = "感兴趣的技术领域（JSON 字符串数组）", example = "[\"Java\", \"Spring Cloud\", \"分布式\"]")
+        @Schema(description = "开始工作时间（年月格式，如：2026-02）")
+        @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$", message = "开始工作时间格式需为 YYYY-MM（如 2026-02）")
+        String workDate,
+
+        @Schema(description = "个人主页（0-100位）")
+        @Size(max = 100, message = "个人主页长度不能超过 100")
+        String homePage,
+
+        @Schema(description = "个人介绍（0-100位）")
+        @Size(max = 100, message = "个人介绍长度不能超过 100")
+        String bio,
+
+        @Schema(description = "感兴趣的技术领域（JSON 字符串数组）", example = "[\"移动开发\", \"软件设计与数据结构和算法\"]")
         String interestedDomains
 ) {
     /**
@@ -52,18 +50,17 @@ public record ProfilePatchRequest(
      */
     public boolean hasAnyField() {
         return nickname != null
-                || bio != null
-                || gender != null
-                || birthday != null
-                || company != null
+                || jobDirection != null
                 || jobTitle != null
-                || school != null
+                || company != null
+                || workDate != null
+                || homePage != null
+                || bio != null
                 || interestedDomains != null;
     }
 
     /**
      * 转换为 User 局部更新实体对象
-     * <p>
      *
      * @param userId 用户 ID
      * @return 用户更新实体
@@ -72,12 +69,12 @@ public record ProfilePatchRequest(
         return User.builder()
                 .id(userId)
                 .nickname(StrUtil.trim(nickname))
-                .bio(StrUtil.trim(bio))
-                .gender(StrUtil.isNotBlank(gender) ? gender.trim().toUpperCase() : null)
-                .birthday(birthday)
-                .company(StrUtil.trim(company))
+                .jobDirection(StrUtil.trim(jobDirection))
                 .jobTitle(StrUtil.trim(jobTitle))
-                .school(StrUtil.trim(school))
+                .company(StrUtil.trim(company))
+                .workDate(StrUtil.trim(workDate))
+                .homePage(StrUtil.trim(homePage))
+                .bio(StrUtil.trim(bio))
                 .interestedDomains(StrUtil.trim(interestedDomains))
                 .build();
     }

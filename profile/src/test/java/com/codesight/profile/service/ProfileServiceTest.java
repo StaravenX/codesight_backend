@@ -19,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.time.LocalDate;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -57,11 +56,11 @@ class ProfileServiceTest {
                 .csId("geek_old")
                 .avatar("old_avatar.png")
                 .bio("原简介")
-                .gender("MALE")
-                .birthday(LocalDate.of(1998, 5, 20))
+                .jobDirection("移动端开发")
                 .company("原公司")
                 .jobTitle("工程师")
-                .school("原大学")
+                .workDate("2026-02")
+                .homePage("https://juejin.cn/user/123")
                 .interestedDomains("[\"Java\"]")
                 .build();
     }
@@ -69,8 +68,8 @@ class ProfileServiceTest {
     @Test
     void updateProfile_Success() {
         ProfilePatchRequest request = new ProfilePatchRequest(
-                "新昵称", "新简介", "FEMALE", null,
-                null, null, null, null
+                "新昵称", "移动端开发", "资深开发", "新公司",
+                "2026-02", "https://juejin.cn/user/123", "新简介", null
         );
 
         when(userService.getById(1L)).thenReturn(existingUser);
