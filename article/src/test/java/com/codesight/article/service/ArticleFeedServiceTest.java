@@ -13,8 +13,8 @@ import com.codesight.article.model.enums.ArticleVisible;
 import com.codesight.article.model.enums.FeedSortType;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
-import com.codesight.user.User;
-import com.codesight.user.UserService;
+import com.codesight.user.UserBaseInfo;
+import com.codesight.user.UserCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class ArticleFeedServiceTest {
     private TagMapper tagMapper;
 
     @Mock
-    private UserService userService;
+    private UserCacheService userCacheService;
 
     @Mock
     private CounterService counterService;
@@ -59,7 +59,7 @@ class ArticleFeedServiceTest {
                 articleMapper,
                 articleTagRelMapper,
                 tagMapper,
-                userService,
+                userCacheService,
                 counterService,
                 recommendRankService
         );
@@ -98,8 +98,8 @@ class ArticleFeedServiceTest {
         when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
                 .thenReturn(mockList);
 
-        User author = User.builder().id(100L).nickname("极客作者").avatar("https://example.com/a.png").jobTitle("架构师").company("测试公司").build();
-        when(userService.listByIds(anySet())).thenReturn(List.of(author));
+        UserBaseInfo author = new UserBaseInfo(100L, "极客作者", "https://example.com/a.png", null, null, null);
+        when(userCacheService.batchGetUserBaseInfo(any())).thenReturn(Map.of(100L, author));
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
                 .size(20)

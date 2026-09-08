@@ -4,12 +4,13 @@ import com.codesight.common.exception.BusinessException;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import com.codesight.profile.api.dto.AuthorCardResponse;
-import com.codesight.profile.model.AuthorCardStatic;
 import com.codesight.profile.api.dto.ProfilePatchRequest;
 import com.codesight.profile.api.dto.ProfileResponse;
 import com.codesight.storage.service.StorageService;
 import com.codesight.user.User;
 import com.codesight.user.UserService;
+import com.codesight.user.UserBaseInfo;
+import com.codesight.user.UserCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +42,7 @@ class ProfileServiceTest {
     private CounterService counterService;
 
     @Mock
-    private ProfileCacheService profileCacheService;
+    private UserCacheService userCacheService;
 
     @InjectMocks
     private ProfileService profileService;
@@ -79,7 +80,7 @@ class ProfileServiceTest {
 
         assertNotNull(response);
         verify(userService).updateById(any(User.class));
-        verify(profileCacheService).evictCache(1L);
+        verify(userCacheService).evictUser(1L);
     }
 
     @Test
@@ -117,7 +118,7 @@ class ProfileServiceTest {
         assertNotNull(response);
         verify(storageService).uploadFile(anyString(), eq(file));
         verify(userService).updateById(any(User.class));
-        verify(profileCacheService).evictCache(1L);
+        verify(userCacheService).evictUser(1L);
     }
 
     @Test
@@ -150,16 +151,16 @@ class ProfileServiceTest {
 
     @Test
     void getAuthorCard_Success_WithFollowStatus() {
-        AuthorCardStatic staticDto = AuthorCardStatic.builder()
-                .id(1L)
-                .nickname("原昵称")
-                .avatar("old_avatar.png")
-                .bio("原简介")
-                .jobTitle("工程师")
-                .company("原公司")
-                .build();
+        UserBaseInfo userInfo = new UserBaseInfo(
+                1L,
+                "原昵称",
+                "old_avatar.png",
+                "原简介",
+                "工程师",
+                "原公司"
+        );
 
-        when(profileCacheService.getStaticCard(1L)).thenReturn(staticDto);
+        when(userCacheService.getUserBaseInfo(1L)).thenReturn(userInfo);
         when(counterService.getCounts(eq(CounterSchema.EntityType.USER), eq("1")))
                 .thenReturn(Map.of(
                         CounterSchema.UserMetric.VIEWS_RECEIVED, 1200L,
@@ -185,7 +186,7 @@ class ProfileServiceTest {
 
     @Test
     void getAuthorCard_AuthorNotFound_ShouldThrowException() {
-        when(profileCacheService.getStaticCard(999L)).thenReturn(null);
+        when(userCacheService.getUserBaseInfo(999L)).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> profileService.getAuthorCard(999L, null));
     }

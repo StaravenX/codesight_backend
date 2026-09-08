@@ -30,6 +30,11 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
+        <!-- User -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>user</artifactId>
+        </dependency>
     </dependencies>
 
 </project>
