@@ -45,7 +45,7 @@ public class ArticleController {
      */
     @PostMapping("/create")
     @Operation(summary = "创建文章或草稿", description = "自动解析 Markdown AST 智能提取摘要与字数，可直接发布或保存为草稿")
-    @RateLimit(windowSeconds = 60, maxRequests = 10)
+    @RateLimit()
     public ArticleCreateResponse createArticle(
             @Valid @RequestBody ArticleCreateRequest request,
             @Parameter(hidden = true) @CurrentUserId Long authorId) {
@@ -62,7 +62,7 @@ public class ArticleController {
      */
     @PatchMapping("/update/{id}")
     @Operation(summary = "修改文章或草稿", description = "支持文章标题、正文、分类、标签等局部增量更新，以及草稿发布状态流转")
-    @RateLimit(windowSeconds = 60, maxRequests = 60)
+    @RateLimit(maxRequests = 60)
     public ArticlePatchResponse updateArticle(
             @PathVariable("id") Long id,
             @Valid @RequestBody ArticlePatchRequest request,
@@ -78,7 +78,7 @@ public class ArticleController {
      */
     @GetMapping("/detail/{id}")
     @Operation(summary = "获取文章详情", description = "根据文章 ID 获取文章详情")
-    @RateLimit(windowSeconds = 60, maxRequests = 300) 
+    @RateLimit(maxRequests = 300)
     public ArticleDetailResponse getDetail(
             @PathVariable("id") Long id,
             @CurrentUserId(required = false) Long userId
@@ -95,7 +95,7 @@ public class ArticleController {
      */
     @GetMapping("/feed")
     @Operation(summary = "获取文章信息流", description = "支持最新与推荐排序、分类频道、标签聚合过滤以及游标分页")
-    @RateLimit(windowSeconds = 60, maxRequests = 300)
+    @RateLimit(maxRequests = 300)
     public ArticleFeedPageResponse getFeed(
             @Valid @ModelAttribute ArticleFeedRequest request,
             @CurrentUserId(required = false) Long userId) {
@@ -111,7 +111,7 @@ public class ArticleController {
      */
     @GetMapping("/{id}/related")
     @Operation(summary = "获取文章相关推荐", description = "智能匹配同标签与同分类技术文章，并实时装配计数与互动状态")
-    @RateLimit(windowSeconds = 60, maxRequests = 300)
+    @RateLimit(maxRequests = 300)
     public List<ArticleFeedItemResponse> getRelated(
             @PathVariable("id") Long id,
             @CurrentUserId(required = false) Long userId) {

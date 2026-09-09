@@ -19,6 +19,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -115,5 +116,40 @@ class RelationCacheServiceTest {
 
         relationCacheService.removeFollowing(USER_A, USER_B);
         verify(setOperations).remove(key, String.valueOf(USER_B));
+    }
+
+    @Test
+    @DisplayName("getFollowingUserIds：入参为 null 时直接返回空集合")
+    void testGetFollowingUserIds_NullUserId() {
+        Set<Long> result = relationCacheService.getFollowingUserIds(null);
+        assertThat(result).isEmpty();
+        verifyNoInteractions(stringRedisTemplate, userFollowingMapper);
+    }
+
+    @Test
+    @DisplayName("getFollowingUserIds：正常读取关注 ID 集合并过滤空哨兵值")
+    void testGetFollowingUserIds_Success() {
+        String key = RelationRedisKeys.getFollowingKey(USER_A);
+        when(stringRedisTemplate.hasKey(key)).thenReturn(true);
+        when(stringRedisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members(key)).thenReturn(Set.of("1002", "1003", RelationRedisKeys.EMPTY_SENTINEL));
+
+        Set<Long> result = relationCacheService.getFollowingUserIds(USER_A);
+
+        assertThat(result).containsExactlyInAnyOrder(1002L, 1003L);
+        assertThat(result).doesNotContain(-1L);
+    }
+
+    @Test
+    @DisplayName("getFollowingUserIds：仅包含哨兵值时返回空集合")
+    void testGetFollowingUserIds_OnlySentinel_ReturnsEmpty() {
+        String key = RelationRedisKeys.getFollowingKey(USER_A);
+        when(stringRedisTemplate.hasKey(key)).thenReturn(true);
+        when(stringRedisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members(key)).thenReturn(Set.of(RelationRedisKeys.EMPTY_SENTINEL));
+
+        Set<Long> result = relationCacheService.getFollowingUserIds(USER_A);
+
+        assertThat(result).isEmpty();
     }
 }

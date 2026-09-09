@@ -21,6 +21,15 @@ import com.codesight.user.UserBaseInfo;
 import com.codesight.user.UserCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.codesight.article.constant.FeedRedisKeys;
+import com.codesight.relation.mapper.UserFollowerMapper;
+import com.codesight.relation.model.UserFollower;
+import com.codesight.relation.service.RelationCacheService;
+import org.checkerframework.checker.nullness.qual.NonNull;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -48,21 +57,35 @@ public class ArticleFeedService {
     private final UserCacheService userCacheService;
     private final CounterService counterService;
     private final RecommendRankService recommendRankService;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final UserFollowerMapper userFollowerMapper;
+    private final RelationCacheService relationCacheService;
 
     /**
-     * 获取文章信息流
+     * 获取文章信息流（推荐、最新、关注三大分支）
      *
      * @param request       分页请求参数
      * @param currentUserId 当前登录用户 ID（可为空）
      * @return 分页信息流响应体
      */
     public ArticleFeedPageResponse getFeed(ArticleFeedRequest request, Long currentUserId) {
+        FeedSortType sortType = (request.sortBy() != null) ? request.sortBy() : FeedSortType.RECOMMENDED;
+        return switch (sortType) {
+            case FOLLOWING -> getFollowingFeed(request, currentUserId);
+            case RECOMMENDED -> getRecommendedFeed(request, currentUserId);
+            case NEWEST -> getNewestFeed(request, currentUserId);
+        };
+    }
+
+    /**
+     * 综合推荐信息流（全站推荐候选池 + MySQL 频道/标签多维推荐）
+     */
+    private ArticleFeedPageResponse getRecommendedFeed(ArticleFeedRequest request, Long currentUserId) {
         // 多查一条数据，高效判断是否有下一页
         int limitSize = request.size() + 1;
-        boolean isRecommended = (request.sortBy() == FeedSortType.RECOMMENDED);
-        boolean isDefaultRecommended = isRecommended && request.authorId() == null && request.tagId() == null && request.categoryId() == null;
+        boolean isDefaultRecommended = request.authorId() == null && request.tagId() == null && request.categoryId() == null;
 
-        // 1. 推荐流全站主流
+        // 1. 全站推荐主流（从Redis推荐池中获取）
         if (isDefaultRecommended) {
             FeedCursor cursor = parseCursor(request.cursor(), CURSOR_PREFIX_RECOMMENDED);
             Double cursorRankScore = cursor != null ? (double) cursor.value() : null;
@@ -101,45 +124,24 @@ public class ArticleFeedService {
             }
         }
 
-        // 2. MySQL 查询
-        List<Article> rawList;
-        if (isRecommended) {
-            FeedCursor cursor = parseCursor(request.cursor(), CURSOR_PREFIX_RECOMMENDED);
-            Long cursorRankScore = cursor != null ? cursor.value() : null;
-            Long cursorId = cursor != null ? cursor.articleId() : null;
-            Instant earliestPublishTime = Instant.now().minus(30, ChronoUnit.DAYS);
+        // 2. MySQL 游标查询推荐流（适用频道/标签/作者过滤、全站推荐池见底后的推荐流）
+        FeedCursor cursor = parseCursor(request.cursor(), CURSOR_PREFIX_RECOMMENDED);
+        Long cursorRankScore = cursor != null ? cursor.value() : null;
+        Long cursorId = cursor != null ? cursor.articleId() : null;
+        Instant earliestPublishTime = Instant.now().minus(30, ChronoUnit.DAYS);
 
-            rawList = articleMapper.selectFeedRecommended(
-                    request.categoryId(),
-                    request.tagId(),
-                    request.authorId(),
-                    earliestPublishTime,
-                    cursorRankScore,
-                    cursorId,
-                    limitSize
-            );
-        } else {
-            FeedCursor cursor = parseCursor(request.cursor(), CURSOR_PREFIX_NEWEST);
-            Instant cursorTime = cursor != null ? Instant.ofEpochMilli(cursor.value()) : null;
-            Long cursorId = cursor != null ? cursor.articleId() : null;
-
-            rawList = articleMapper.selectFeedNewest(
-                    request.categoryId(),
-                    request.tagId(),
-                    request.authorId(),
-                    cursorTime,
-                    cursorId,
-                    limitSize
-            );
-        }
+        List<Article> rawList = articleMapper.selectFeedRecommended(
+                request.categoryId(),
+                request.tagId(),
+                request.authorId(),
+                earliestPublishTime,
+                cursorRankScore,
+                cursorId,
+                limitSize
+        );
 
         if (rawList == null || rawList.isEmpty()) {
             return new ArticleFeedPageResponse(Collections.emptyList(), null, false);
-        }
-
-        // 3. 回填 Redis 候选池
-        if (isDefaultRecommended) {
-            recommendRankService.batchAddScores(rawList);
         }
 
         boolean hasMore = rawList.size() > request.size();
@@ -148,13 +150,45 @@ public class ArticleFeedService {
         String nextCursor = null;
         if (hasMore && !articles.isEmpty()) {
             Article last = articles.getLast();
-            if (isRecommended) {
-                long rankScore = last.getRankScore().longValue();
-                nextCursor = buildCursor(CURSOR_PREFIX_RECOMMENDED, rankScore, last.getId());
-            } else {
-                long millis = last.getPublishTime() != null ? last.getPublishTime().toEpochMilli() : 0L;
-                nextCursor = buildCursor(CURSOR_PREFIX_NEWEST, millis, last.getId());
-            }
+            long rankScore = (last.getRankScore() != null) ? last.getRankScore().longValue() : 0L;
+            nextCursor = buildCursor(CURSOR_PREFIX_RECOMMENDED, rankScore, last.getId());
+        }
+
+        List<ArticleFeedItemResponse> items = hydrateFeedItems(articles, currentUserId);
+        return new ArticleFeedPageResponse(items, nextCursor, hasMore);
+    }
+
+    /**
+     * 最新发布信息流（Keyset 游标寻址，按发布时间倒序）
+     */
+    private ArticleFeedPageResponse getNewestFeed(ArticleFeedRequest request, Long currentUserId) {
+        int limitSize = request.size() + 1;
+
+        FeedCursor cursor = parseCursor(request.cursor(), CURSOR_PREFIX_NEWEST);
+        Instant cursorTime = cursor != null ? Instant.ofEpochMilli(cursor.value()) : null;
+        Long cursorId = cursor != null ? cursor.articleId() : null;
+
+        List<Article> rawList = articleMapper.selectFeedNewest(
+                request.categoryId(),
+                request.tagId(),
+                request.authorId(),
+                cursorTime,
+                cursorId,
+                limitSize
+        );
+
+        if (rawList == null || rawList.isEmpty()) {
+            return new ArticleFeedPageResponse(Collections.emptyList(), null, false);
+        }
+
+        boolean hasMore = rawList.size() > request.size();
+        List<Article> articles = hasMore ? rawList.subList(0, request.size()) : rawList;
+
+        String nextCursor = null;
+        if (hasMore && !articles.isEmpty()) {
+            Article last = articles.getLast();
+            long millis = (last.getPublishTime() != null) ? last.getPublishTime().toEpochMilli() : 0L;
+            nextCursor = buildCursor(CURSOR_PREFIX_NEWEST, millis, last.getId());
         }
 
         List<ArticleFeedItemResponse> items = hydrateFeedItems(articles, currentUserId);
@@ -197,6 +231,212 @@ public class ArticleFeedService {
         }
 
         return hydrateFeedItems(relatedArticles, currentUserId);
+    }
+
+    /**
+     * 获取社交关注流（推拉结合）
+     *
+     * @param request       分页请求参数
+     * @param currentUserId 当前登录用户 ID（可为空）
+     * @return 关注流分页响应体
+     */
+    public ArticleFeedPageResponse getFollowingFeed(ArticleFeedRequest request, Long currentUserId) {
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "请先登录后查看关注动态");
+        }
+        String cursorStr = request.cursor();
+        Integer pageSize = request.size();
+
+        // 1. 获取当前用户关注的所有博主集合
+        Set<Long> followingIds = relationCacheService.getFollowingUserIds(currentUserId);
+        if (followingIds == null || followingIds.isEmpty()) {
+            return new ArticleFeedPageResponse(Collections.emptyList(), null, false);
+        }
+
+        // 2. 批量探测关注博主的粉丝数，识别出大 V
+        List<String> authorKeys = followingIds.stream().map(String::valueOf).toList();
+        Map<String, Map<CounterSchema.MetricItem, Long>> countsMap = counterService.batchGetCounts(CounterSchema.EntityType.USER, authorKeys);
+
+        List<Long> bigVAuthorIds = new ArrayList<>();
+        for (Long authorId : followingIds) {
+            Map<CounterSchema.MetricItem, Long> authorCounts = countsMap.get(String.valueOf(authorId));
+            long followers = authorCounts != null
+                    ? authorCounts.getOrDefault(CounterSchema.UserMetric.FOLLOWERS, 0L)
+                    : 0L;
+            if (isBigV(authorId, followers)) {
+                bigVAuthorIds.add(authorId);
+            }
+        }
+
+        // 3. 计算查询最大分数窗口
+        double maxScore = Double.POSITIVE_INFINITY;
+        if (cursorStr != null && !cursorStr.isBlank()) {
+            try {
+                long cursorTimeMs = Long.parseLong(cursorStr.trim());
+                maxScore = cursorTimeMs - 1;
+            } catch (NumberFormatException ignored) {
+                // 忽略非数字格式，走最新窗口
+            }
+        }
+
+        final double queryMaxScore = maxScore;
+        final int fetchLimit = pageSize + 1;
+
+        // 4. 利用 Pipeline 一次性批量拉取个人收件箱与所有大 V 发件箱候选集
+        List<Object> pipelineResults = stringRedisTemplate.executePipelined(new SessionCallback<>() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public Object execute(@NonNull RedisOperations operations) throws DataAccessException {
+                // 个人收件箱（推）
+                operations.opsForZSet().reverseRangeByScoreWithScores(
+                        FeedRedisKeys.getInboxKey(currentUserId), 0, queryMaxScore, 0, fetchLimit);
+
+                // 大 V 发件箱（拉）
+                for (Long bigVId : bigVAuthorIds) {
+                    operations.opsForZSet().reverseRangeByScoreWithScores(
+                            FeedRedisKeys.getOutboxKey(bigVId), 0, queryMaxScore, 0, fetchLimit);
+                }
+                return null;
+            }
+        });
+
+        // 5. 聚合所有流的候选元素
+        record FeedCandidate(long articleId, long publishTimeMs) {}
+        List<FeedCandidate> candidates = new ArrayList<>();
+
+        for (Object result : pipelineResults) {
+            if (result instanceof Set<?> tupleSet) {
+                for (Object item : tupleSet) {
+                    if (item instanceof TypedTuple<?> tuple && tuple.getValue() != null && tuple.getScore() != null) {
+                        try {
+                            long aId = Long.parseLong((String) tuple.getValue());
+                            long pTime = tuple.getScore().longValue();
+                            candidates.add(new FeedCandidate(aId, pTime));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            return new ArticleFeedPageResponse(Collections.emptyList(), null, false);
+        }
+
+        // 6. 去重与时间倒序归并
+        Set<Long> seenArticleIds = new HashSet<>();
+        List<FeedCandidate> sortedCandidates = candidates.stream()
+                .filter(c -> seenArticleIds.add(c.articleId()))
+                .sorted((a, b) -> {
+                    int cmp = Long.compare(b.publishTimeMs(), a.publishTimeMs());
+                    return cmp != 0 ? cmp : Long.compare(b.articleId(), a.articleId());
+                })
+                .toList();
+
+        boolean hasMore = sortedCandidates.size() > pageSize;
+        List<FeedCandidate> paged = hasMore ? sortedCandidates.subList(0, pageSize) : sortedCandidates;
+
+        String nextCursor = null;
+        if (hasMore && !paged.isEmpty()) {
+            nextCursor = String.valueOf(paged.getLast().publishTimeMs());
+        }
+
+        List<Long> targetArticleIds = paged.stream().map(FeedCandidate::articleId).toList();
+
+        // 7. 批量拉取有效文章并保持排序
+        List<Article> rawArticles = articleMapper.selectByIds(targetArticleIds);
+        if (rawArticles == null || rawArticles.isEmpty()) {
+            return new ArticleFeedPageResponse(Collections.emptyList(), nextCursor, hasMore);
+        }
+
+        Map<Long, Article> articleMap = rawArticles.stream()
+                .filter(a -> a.getStatus() == ArticleStatus.PUBLISHED && a.getVisible() == ArticleVisible.PUBLIC)
+                .collect(Collectors.toMap(Article::getId, a -> a));
+
+        List<Article> orderedArticles = new ArrayList<>();
+        for (Long id : targetArticleIds) {
+            Article a = articleMap.get(id);
+            if (a != null) {
+                orderedArticles.add(a);
+            }
+        }
+
+        List<ArticleFeedItemResponse> items = hydrateFeedItems(orderedArticles, currentUserId);
+        return new ArticleFeedPageResponse(items, nextCursor, hasMore);
+    }
+
+    /**
+     * 文章公开发布事件触发：同步维护推荐候选池与推拉结合分流
+     *
+     * @param article 发布成功的文章实体
+     */
+    public void onArticlePublished(Article article) {
+        Long authorId = article.getAuthorId();
+        Long articleId = article.getId();
+        long publishTimeMs = article.getPublishTime().toEpochMilli();
+
+        // 1. 推荐候选池更新
+        recommendRankService.addOrIncrScore(articleId, 0.0);
+
+        // 2. 写入发件箱
+        String outboxKey = FeedRedisKeys.getOutboxKey(authorId);
+        stringRedisTemplate.opsForZSet().add(outboxKey, String.valueOf(articleId), publishTimeMs);
+        stringRedisTemplate.opsForZSet().removeRange(outboxKey, 0, -(FeedRedisKeys.OUTBOX_MAX_CAPACITY + 1));
+
+        // 3. 判定博主粉丝数
+        Map<CounterSchema.MetricItem, Long> userCounts = counterService.getCounts(
+                CounterSchema.EntityType.USER,
+                String.valueOf(authorId)
+        );
+        long followerCount = userCounts != null
+                ? userCounts.getOrDefault(CounterSchema.UserMetric.FOLLOWERS, 0L)
+                : 0L;
+
+        // 4.1 若为大V，不需要写扩散，直接返回
+        if (isBigV(authorId, followerCount)) {
+            return;
+        }
+
+        // 4.2 普通博主：查询有效粉丝列表并执行写扩散
+        List<UserFollower> followerList = userFollowerMapper.selectList(
+                new LambdaQueryWrapper<UserFollower>()
+                        .select(UserFollower::getFromUserId)
+                        .eq(UserFollower::getToUserId, authorId)
+        );
+
+        if (followerList == null || followerList.isEmpty()) {
+            return;
+        }
+
+        List<Long> fanIds = followerList.stream()
+                .map(UserFollower::getFromUserId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        // 利用 Redis Pipeline 批量推入粉丝收件箱并维护容量上限
+        stringRedisTemplate.executePipelined(new SessionCallback<>() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public Object execute(@NonNull RedisOperations operations) throws DataAccessException {
+                for (Long fanId : fanIds) {
+                    String inboxKey = FeedRedisKeys.getInboxKey(fanId);
+                    operations.opsForZSet().add(inboxKey, String.valueOf(articleId), publishTimeMs);
+                    operations.opsForZSet().removeRange(inboxKey, 0, -(FeedRedisKeys.INBOX_MAX_CAPACITY + 1));
+                }
+                return null;
+            }
+        });
+    }
+
+    /**
+     * 文章删除/下架事件触发：从全站推荐池与发件箱移除
+     *
+     * @param article 文章实体
+     */
+    public void onArticleRemoved(Article article) {
+        recommendRankService.removeArticle(article.getId());
+        String outboxKey = FeedRedisKeys.getOutboxKey(article.getAuthorId());
+        stringRedisTemplate.opsForZSet().remove(outboxKey, String.valueOf(article.getId()));
     }
 
     public List<ArticleFeedItemResponse> hydrateFeedItems(List<Article> articles, Long currentUserId) {
@@ -337,6 +577,103 @@ public class ArticleFeedService {
     private String buildCursor(String prefix, long value, long articleId) {
         String raw = prefix + ":" + value + ":" + articleId;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 判定创作者是否为明星大 V
+     * <p>
+     * 1. 晋升大 V 门限：粉丝数 >= 5,500，记录大 V 集合并返回 true；
+     * 2. 跌落普通人门限：粉丝数 < 4,500，从大 V 集合移除并返回 false；
+     * 3. 缓冲迟滞带 [4,500, 5,500)：维持作者既有状态不变。
+     *
+     * @param authorId 创作者 ID
+     * @param followerCount 当前粉丝数
+     * @return true 表示为大 V（拉模式），false 表示为普通博主（推模式）
+     */
+    public boolean isBigV(Long authorId, long followerCount) {
+        if (followerCount >= FeedRedisKeys.BIG_V_PROMOTION_THRESHOLD) {
+            stringRedisTemplate.opsForSet().add(FeedRedisKeys.BIG_V_SET_KEY, String.valueOf(authorId));
+            return true;
+        }
+        if (followerCount < FeedRedisKeys.BIG_V_DEMOTION_THRESHOLD) {
+            Long removed = stringRedisTemplate.opsForSet().remove(FeedRedisKeys.BIG_V_SET_KEY, String.valueOf(authorId));
+            if (removed != null && removed > 0) {
+                // 异步触发发件箱历史文章回填粉丝收件箱
+                triggerDemotionBackfill(authorId);
+            }
+            return false;
+        }
+        // 落在 [4500, 5500) 缓冲区，维持作者既有角色
+        Boolean isMember = stringRedisTemplate.opsForSet().isMember(
+                FeedRedisKeys.BIG_V_SET_KEY, String.valueOf(authorId));
+        return Boolean.TRUE.equals(isMember);
+    }
+
+    /**
+     * 触发大 V 降级异步补偿
+     *
+     * @param authorId 降级作者 ID
+     */
+    public void triggerDemotionBackfill(Long authorId) {
+        if (authorId == null) {
+            return;
+        }
+        Thread.ofVirtual().name("demotion-backfill-" + authorId).start(() -> backfillOnDemotion(authorId));
+    }
+
+    /**
+     * 大 V 降级补偿核心逻辑
+     *
+     * @param authorId 降级作者 ID
+     */
+    public void backfillOnDemotion(Long authorId) {
+        if (authorId == null) {
+            return;
+        }
+
+        // 1. 从发件箱取出该作者近期的有效文章
+        Set<TypedTuple<String>> outboxTuples = stringRedisTemplate.opsForZSet()
+                .reverseRangeWithScores(FeedRedisKeys.getOutboxKey(authorId), 0, 19);
+        if (outboxTuples == null || outboxTuples.isEmpty()) {
+            return;
+        }
+
+        // 2. 查出该作者现存的所有有效粉丝
+        List<UserFollower> followers = userFollowerMapper.selectList(
+                new LambdaQueryWrapper<UserFollower>()
+                        .select(UserFollower::getFromUserId)
+                        .eq(UserFollower::getToUserId, authorId)
+        );
+        if (followers == null || followers.isEmpty()) {
+            return;
+        }
+
+        List<Long> fanIds = followers.stream()
+                .map(UserFollower::getFromUserId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (fanIds.isEmpty()) {
+            return;
+        }
+
+        // 3. 利用 Pipeline 批量补偿推入粉丝的收件箱并维护容量上限截断
+        stringRedisTemplate.executePipelined(new SessionCallback<>() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public Object execute(@NonNull RedisOperations operations) throws DataAccessException {
+                for (Long fanId : fanIds) {
+                    String inboxKey = FeedRedisKeys.getInboxKey(fanId);
+                    for (TypedTuple<String> tuple : outboxTuples) {
+                        if (tuple.getValue() != null && tuple.getScore() != null) {
+                            operations.opsForZSet().add(inboxKey, tuple.getValue(), tuple.getScore());
+                        }
+                    }
+                    operations.opsForZSet().removeRange(inboxKey, 0, -(FeedRedisKeys.INBOX_MAX_CAPACITY + 1));
+                }
+                return null;
+            }
+        });
+
     }
 
     private record FeedCursor(long value, long articleId) {}

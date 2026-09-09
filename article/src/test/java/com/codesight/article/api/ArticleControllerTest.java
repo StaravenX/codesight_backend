@@ -143,4 +143,23 @@ class ArticleControllerTest {
         assertEquals(1002L, list.getFirst().getId());
         verify(articleFeedService).listRelatedArticles(1001L, 2001L);
     }
+
+    @Test
+    @DisplayName("测试通用信息流接口按 FOLLOWING 分发")
+    void testGetFeed_FollowingDispatch() {
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .sortBy(FeedSortType.FOLLOWING)
+                .cursor("5555")
+                .size(15)
+                .build();
+
+        ArticleFeedPageResponse mockPage = new ArticleFeedPageResponse(List.of(), "6666", false);
+        when(articleFeedService.getFeed(eq(request), eq(2001L))).thenReturn(mockPage);
+
+        ArticleFeedPageResponse response = articleController.getFeed(request, 2001L);
+
+        assertNotNull(response);
+        assertEquals("6666", response.nextCursor());
+        verify(articleFeedService).getFeed(request, 2001L);
+    }
 }

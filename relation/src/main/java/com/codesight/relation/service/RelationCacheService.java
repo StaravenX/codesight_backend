@@ -152,4 +152,32 @@ public class RelationCacheService {
         // 设置随机打散的 TTL
         stringRedisTemplate.expire(key, RelationRedisKeys.getRandomizedTtl());
     }
+
+    /**
+     * 获取用户关注的所有目标用户 ID 集合
+     *
+     * @param fromUserId 发起者 ID
+     * @return 关注的目标用户 ID 集合
+     */
+    public Set<Long> getFollowingUserIds(Long fromUserId) {
+        if (fromUserId == null) {
+            return Collections.emptySet();
+        }
+        ensureFollowingLoaded(fromUserId);
+        String key = RelationRedisKeys.getFollowingKey(fromUserId);
+        Set<String> members = stringRedisTemplate.opsForSet().members(key);
+        if (members == null || members.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> result = new HashSet<>(members.size());
+        for (String member : members) {
+            if (!RelationRedisKeys.EMPTY_SENTINEL.equals(member)) {
+                try {
+                    result.add(Long.parseLong(member));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return result;
+    }
 }

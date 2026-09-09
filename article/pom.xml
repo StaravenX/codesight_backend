@@ -36,6 +36,12 @@
             <artifactId>user</artifactId>
         </dependency>
 
+        <!-- relation -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>relation</artifactId>
+        </dependency>
+
         <!-- MyBatisPlus -->
         <dependency>
             <groupId>com.baomidou</groupId>
