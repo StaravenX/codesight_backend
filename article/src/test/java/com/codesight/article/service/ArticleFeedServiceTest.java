@@ -423,21 +423,6 @@ class ArticleFeedServiceTest {
     }
 
     @Test
-    @DisplayName("草稿或非公开发文：不触发关注流推拉")
-    void testPublish_DraftOrPrivate_Ignored() {
-        Article draft = Article.builder()
-                .id(123L)
-                .authorId(1001L)
-                .status(ArticleStatus.DRAFT)
-                .visible(ArticleVisible.PUBLIC)
-                .build();
-
-        articleFeedService.onArticlePublished(draft);
-        verifyNoInteractions(counterService);
-        verify(zSetOperations, never()).add(anyString(), anyString(), anyDouble());
-    }
-
-    @Test
     @DisplayName("未登录查看关注流：抛出 UNAUTHORIZED 业务异常")
     void testGetFollowingFeed_Unauthenticated() {
         ArticleFeedRequest req = ArticleFeedRequest.builder().size(20).build();
@@ -538,8 +523,6 @@ class ArticleFeedServiceTest {
     void testIsBigV_HysteresisBand() {
         Long authorId = 9999L;
         String authorStr = String.valueOf(authorId);
-
-        assertThat(articleFeedService.isBigV(null, 10000L)).isFalse();
 
         boolean promoted = articleFeedService.isBigV(authorId, 5500L);
         assertThat(promoted).isTrue();

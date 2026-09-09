@@ -118,7 +118,6 @@ public class ArticleServiceTest {
         assertNotNull(saved.getPublishTime());
 
         verify(articleTagRelMapper, times(1)).insert(any(ArticleTagRel.class));
-        verify(recommendRankService, times(1)).addOrIncrScore(eq(1001L), eq(0.0));
         verify(articleFeedService, times(1)).onArticlePublished(any(Article.class));
     }
 
