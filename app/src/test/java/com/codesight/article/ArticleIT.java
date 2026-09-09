@@ -15,10 +15,14 @@ import com.codesight.article.model.entity.Article;
 import com.codesight.article.model.entity.ArticleTagRel;
 import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.FeedSortType;
+import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
+import com.codesight.article.constant.FeedRedisKeys;
 import com.codesight.article.service.ArticleCacheService;
 import com.codesight.article.service.ArticleFeedService;
 import com.codesight.article.service.ArticleService;
 import com.codesight.article.service.RecommendRankService;
+import com.codesight.common.exception.BusinessException;
+import com.codesight.relation.service.RelationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,7 +44,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * 2. 发布与 Redis ZSET 候选池注入、增量推分、真实 Redis Lua 降温衰减脚本执行；
  * 3. 多级缓存（Caffeine L1 + Redis L2）穿透加载、回填与更新下架双淘汰；
  * 4. Keys-Seek / Keyset 游标分页流拉取与防重翻页；
- * 5. 测试结束后自动清理 MySQL 与 Redis 残留数据
+ * 5. 社交关注流（Following Feed）推拉结合端到端全链路；
+ * 6. 测试结束后自动清理 MySQL 与 Redis 残留数据
  */
 @SpringBootTest(classes = CodeSightApplication.class)
 public class ArticleIT {
@@ -65,6 +70,9 @@ public class ArticleIT {
 
     @Autowired
     private RecommendRankService recommendRankService;
+
+    @Autowired
+    private RelationService relationService;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -274,5 +282,193 @@ public class ArticleIT {
         assertFalse(feedPage.items().isEmpty(), "推荐流中必须能真实检索到刚刚公开发布并入池的文章");
         assertTrue(feedPage.items().stream().anyMatch(item -> item.getId().equals(articleId)),
                 "推荐流 items 中必须包含新发布的测试文章 ID");
+    }
+
+    @Test
+    @DisplayName("IT 场景 5：社交关注流端到端全链路（写扩散推入收件箱、发件箱物理留存与时间倒序拉取）")
+    void testFollowingFeed_FullFlow() {
+        // 1. 创建一位粉丝用户并关注创作者 authorId
+        long seed = System.currentTimeMillis() % 10000000L;
+        com.codesight.user.User fanUser = com.codesight.user.User.builder()
+                .nickname("IT测试粉丝_" + seed)
+                .phone("137" + String.format("%08d", seed))
+                .email("fan_" + seed + "@codesight.com")
+                .csId("cs_fan_" + seed)
+                .build();
+        userMapper.insert(fanUser);
+        Long fanId = fanUser.getId();
+
+        try {
+            // 粉丝关注作者
+            relationService.follow(fanId, authorId);
+
+            // 2. 作者发布一篇公开文章（普通创作者，走写扩散）
+            ArticleCreateRequest publishReq = ArticleCreateRequest.builder()
+                    .title("【容器集成测试】关注流端到端推拉结合验证")
+                    .contentMd("# 社交动态\n普通博主发文写扩散推入粉丝收件箱。")
+                    .coverUrl("https://cdn.codesight.com/covers/feed.png")
+                    .categoryId(1L)
+                    .tagIds(List.of(1L))
+                    .isDraft(false)
+                    .build();
+
+            ArticleCreateResponse createResp = articleService.createArticle(publishReq, authorId);
+            Long articleId = createResp.id();
+            createdArticleIds.add(articleId);
+
+            // 3. 验证物理事实发件箱（Outbox）已写入
+            Double outboxScore = redisTemplate.opsForZSet().score(FeedRedisKeys.getOutboxKey(authorId), String.valueOf(articleId));
+            assertNotNull(outboxScore, "作者发件箱中必须物理留存该文章");
+
+            // 4. 验证写扩散：粉丝个人收件箱（Inbox）已收到推送
+            Double inboxScore = redisTemplate.opsForZSet().score(FeedRedisKeys.getInboxKey(fanId), String.valueOf(articleId));
+            assertNotNull(inboxScore, "粉丝个人收件箱中必须已推入该文章");
+
+            // 5. 粉丝端拉取关注流（GET /api/v1/articles/feed?sortBy=FOLLOWING）
+            ArticleFeedRequest feedReq = ArticleFeedRequest.builder()
+                    .sortBy(FeedSortType.FOLLOWING)
+                    .size(10)
+                    .build();
+
+            ArticleFeedPageResponse feedPage = articleFeedService.getFeed(feedReq, fanId);
+            assertNotNull(feedPage);
+            assertNotNull(feedPage.items());
+            assertFalse(feedPage.items().isEmpty(), "关注流中必须能够拉取到关注博主发布的文章");
+            assertTrue(feedPage.items().stream().anyMatch(item -> item.getId().equals(articleId)),
+                    "关注流结果集必须包含刚才发布的文章 ID");
+
+            // 验证作者信息装配
+            ArticleFeedItemResponse item = feedPage.items().stream()
+                    .filter(it -> it.getId().equals(articleId))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals(authorId, item.getAuthorId());
+            assertEquals("【容器集成测试】关注流端到端推拉结合验证", item.getTitle());
+
+            // 6. 异常场景保护：未登录拉取关注流必须抛出 BusinessException
+            assertThrows(BusinessException.class, () -> articleFeedService.getFeed(feedReq, null));
+
+        } finally {
+            // 清理粉丝关系与收件箱
+            try {
+                relationService.unfollow(fanId, authorId);
+            } catch (Exception ignored) {}
+            redisTemplate.delete(FeedRedisKeys.getInboxKey(fanId));
+            redisTemplate.delete(FeedRedisKeys.getOutboxKey(authorId));
+            userMapper.deleteById(fanId);
+        }
+    }
+
+    @Test
+    @DisplayName("IT 场景 6：社交关注流推拉结合（Push-Pull Hybrid）与大 V 读扩散多路倒序归并")
+    void testFollowingFeed_HybridPushPull_WithBigVReadDiffusion() throws InterruptedException {
+        // 1. 创建一位大 V 博主与一位粉丝用户
+        long seed = System.currentTimeMillis() % 10000000L;
+        com.codesight.user.User bigVUser = com.codesight.user.User.builder()
+                .nickname("IT测试大V_" + seed)
+                .phone("139" + String.format("%08d", seed))
+                .email("bigv_" + seed + "@codesight.com")
+                .csId("cs_bigv_" + seed)
+                .build();
+        userMapper.insert(bigVUser);
+        Long bigVId = bigVUser.getId();
+
+        com.codesight.user.User fanUser = com.codesight.user.User.builder()
+                .nickname("IT测试融合粉丝_" + seed)
+                .phone("136" + String.format("%08d", seed))
+                .email("fan2_" + seed + "@codesight.com")
+                .csId("cs_fan2_" + seed)
+                .build();
+        userMapper.insert(fanUser);
+        Long fanId = fanUser.getId();
+
+        // 2. 将大 V 用户的粉丝计数写入 Redis 16B SDS 快照（设置为 6000，超过 5500 阈值）
+        byte[] sdsBuffer = new byte[com.codesight.counter.schema.CounterSchema.TOTAL_BYTES];
+        com.codesight.counter.schema.CounterSchema.writeInt32BE(
+                sdsBuffer,
+                com.codesight.counter.schema.CounterSchema.UserMetric.FOLLOWERS.offset(),
+                6000L
+        );
+        String bigVSdsKey = com.codesight.counter.schema.CounterKeys.sdsKey(
+                com.codesight.counter.schema.CounterSchema.EntityType.USER,
+                String.valueOf(bigVId)
+        );
+        redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Void>) connection -> {
+            connection.stringCommands().set(bigVSdsKey.getBytes(java.nio.charset.StandardCharsets.UTF_8), sdsBuffer);
+            return null;
+        });
+
+        try {
+            // 3. 粉丝同时关注普通博主 authorId 与大 V 博主 bigVId
+            relationService.follow(fanId, authorId);
+            relationService.follow(fanId, bigVId);
+
+            // 4. 普通博主发布第 1 篇文章（时间早，走写扩散）
+            ArticleCreateRequest normalReq = ArticleCreateRequest.builder()
+                    .title("【容器集成测试】普通博主文章-推模式")
+                    .contentMd("# 普通博主推文")
+                    .categoryId(1L)
+                    .tagIds(List.of(1L))
+                    .isDraft(false)
+                    .build();
+            ArticleCreateResponse normalResp = articleService.createArticle(normalReq, authorId);
+            Long normalArticleId = normalResp.id();
+            createdArticleIds.add(normalArticleId);
+
+            // 稍微休眠 20ms 以拉开时间戳差距
+            Thread.sleep(20);
+
+            // 5. 大 V 博主发布第 2 篇文章（时间晚，走读扩散）
+            ArticleCreateRequest bigVReq = ArticleCreateRequest.builder()
+                    .title("【容器集成测试】大V博主文章-拉模式")
+                    .contentMd("# 大V博主拉文")
+                    .categoryId(1L)
+                    .tagIds(List.of(1L))
+                    .isDraft(false)
+                    .build();
+            ArticleCreateResponse bigVResp = articleService.createArticle(bigVReq, bigVId);
+            Long bigVArticleId = bigVResp.id();
+            createdArticleIds.add(bigVArticleId);
+
+            // 6. 验证推拉分流：
+            // 6.1 普通博主文章推入了粉丝 Inbox
+            Double normalInboxScore = redisTemplate.opsForZSet().score(FeedRedisKeys.getInboxKey(fanId), String.valueOf(normalArticleId));
+            assertNotNull(normalInboxScore, "普通博主发文必须写扩散推入粉丝收件箱");
+
+            // 6.2 大 V 文章仅入发件箱 Outbox，绝不推入粉丝 Inbox（化解写放大）
+            Double bigVOutboxScore = redisTemplate.opsForZSet().score(FeedRedisKeys.getOutboxKey(bigVId), String.valueOf(bigVArticleId));
+            assertNotNull(bigVOutboxScore, "大 V 发文必须物理保存在大 V 发件箱中");
+            Double bigVInboxScore = redisTemplate.opsForZSet().score(FeedRedisKeys.getInboxKey(fanId), String.valueOf(bigVArticleId));
+            assertNull(bigVInboxScore, "大 V 发文绝不能推入粉丝收件箱，避免写放大");
+
+            // 7. 粉丝拉取关注流：系统触发 Inbox(推) + BigV Outbox(拉) 动态融合归并
+            ArticleFeedRequest feedReq = ArticleFeedRequest.builder()
+                    .sortBy(FeedSortType.FOLLOWING)
+                    .size(10)
+                    .build();
+            ArticleFeedPageResponse feedPage = articleFeedService.getFeed(feedReq, fanId);
+
+            assertNotNull(feedPage);
+            assertNotNull(feedPage.items());
+            assertTrue(feedPage.items().size() >= 2, "关注流应至少包含普通博主与大 V 博主各 1 篇文章");
+
+            // 验证时间倒序：因为大 V 文章后发，其发布时间更新，必须排在第 1 位
+            assertEquals(bigVArticleId, feedPage.items().get(0).getId(), "大 V 最新发布的文章应排在第 1 位");
+            assertEquals(normalArticleId, feedPage.items().get(1).getId(), "普通博主先发布的文章应排在第 2 位");
+
+        } finally {
+            // 清理测试数据
+            try {
+                relationService.unfollow(fanId, authorId);
+                relationService.unfollow(fanId, bigVId);
+            } catch (Exception ignored) {}
+            redisTemplate.delete(FeedRedisKeys.getInboxKey(fanId));
+            redisTemplate.delete(FeedRedisKeys.getOutboxKey(bigVId));
+            redisTemplate.delete(FeedRedisKeys.getOutboxKey(authorId));
+            redisTemplate.delete(bigVSdsKey);
+            redisTemplate.opsForSet().remove(FeedRedisKeys.BIG_V_SET_KEY, String.valueOf(bigVId));
+            userMapper.deleteById(fanId);
+            userMapper.deleteById(bigVId);
+        }
     }
 }
