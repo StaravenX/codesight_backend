@@ -55,6 +55,9 @@ public class ArticleServiceTest {
     @Mock
     private RecommendRankService recommendRankService;
 
+    @Mock
+    private ArticleFeedService articleFeedService;
+
     @InjectMocks
     private ArticleService articleService;
 
@@ -116,6 +119,7 @@ public class ArticleServiceTest {
 
         verify(articleTagRelMapper, times(1)).insert(any(ArticleTagRel.class));
         verify(recommendRankService, times(1)).addOrIncrScore(eq(1001L), eq(0.0));
+        verify(articleFeedService, times(1)).onArticlePublished(any(Article.class));
     }
 
     @Test
@@ -184,6 +188,7 @@ public class ArticleServiceTest {
         verify(articleMapper, times(1)).updateById(existing);
         verify(articleCacheService, times(1)).evictCache(1001L);
         verify(recommendRankService, times(1)).addOrIncrScore(eq(1001L), eq(0.0));
+        verify(articleFeedService, times(1)).onArticlePublished(existing);
         assertEquals("新标题", existing.getTitle());
         assertEquals(ArticleStatus.PUBLISHED, existing.getStatus());
         assertNotNull(existing.getPublishTime());

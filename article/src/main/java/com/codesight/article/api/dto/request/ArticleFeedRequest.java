@@ -31,8 +31,7 @@ public record ArticleFeedRequest(
         @NotNull(message = "每页条数不能为空")
         Integer size,
 
-        @Schema(description = "排序方式：RECOMMENDED=综合推荐，NEWEST=最新发布", defaultValue = "RECOMMENDED")
-        @NotNull(message = "排序方式不能为空")
+        @Schema(description = "排序方式：RECOMMENDED=综合推荐，NEWEST=最新发布，FOLLOWING=社交关注", defaultValue = "RECOMMENDED")
         FeedSortType sortBy
 ) {
 }

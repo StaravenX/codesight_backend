@@ -14,7 +14,8 @@ import lombok.Getter;
 public enum FeedSortType {
 
     RECOMMENDED("recommended", "综合"),
-    NEWEST("newest", "最新");
+    NEWEST("newest", "最新"),
+    FOLLOWING("following", "关注");
 
     @JsonValue
     private final String value;
