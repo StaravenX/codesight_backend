@@ -25,6 +25,7 @@
         <module>counter</module>
         <module>article</module>
         <module>relation</module>
+        <module>search</module>
     </modules>
 
     <properties>
@@ -36,6 +37,7 @@
         <bouncycastle.version>1.78.1</bouncycastle.version>
         <aliyun-oss-v2.version>0.5.1</aliyun-oss-v2.version>
         <commonmark.version>0.30.0</commonmark.version>
+        <elasticsearch-java.version>9.2.1</elasticsearch-java.version>
     </properties>
 
     <dependencyManagement>
@@ -81,6 +83,11 @@
                 <artifactId>relation</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.codesight</groupId>
+                <artifactId>search</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- Third-party Dependencies -->
             <dependency>
@@ -117,6 +124,16 @@
                 <groupId>org.commonmark</groupId>
                 <artifactId>commonmark</artifactId>
                 <version>${commonmark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-client</artifactId>
+                <version>${elasticsearch-java.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

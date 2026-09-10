@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codesight</groupId>
+        <artifactId>codesight_backend</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <artifactId>search</artifactId>
+    <name>search</name>
+    <description>Search</description>
+
+    <dependencies>
+        <!-- Common -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>common</artifactId>
+        </dependency>
+
+        <!-- Counter -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>counter</artifactId>
+        </dependency>
+
+        <!-- Article -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>article</artifactId>
+        </dependency>
+
+        <!-- Elasticsearch -->
+        <dependency>
+            <groupId>co.elastic.clients</groupId>
+            <artifactId>elasticsearch-java</artifactId>
+        </dependency>
+
+        <!-- Elasticsearch -->
+        <dependency>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-client</artifactId>
+        </dependency>
+
+        <!-- Spring Kafka -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>
