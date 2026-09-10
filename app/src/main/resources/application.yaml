@@ -3,6 +3,8 @@ spring:
     name: codesight_backend
   profiles:
     include: auth, storage
+  elasticsearch:
+    uri: http://localhost:9200
   datasource:
     url: jdbc:mysql://localhost:3306/codesight?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: root

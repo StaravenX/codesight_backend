@@ -59,6 +59,12 @@
             <groupId>com.codesight</groupId>
             <artifactId>relation</artifactId>
         </dependency>
+
+        <!-- search -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>search</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
