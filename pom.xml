@@ -26,6 +26,7 @@
         <module>article</module>
         <module>relation</module>
         <module>search</module>
+        <module>ai</module>
     </modules>
 
     <properties>
@@ -38,6 +39,7 @@
         <aliyun-oss-v2.version>0.5.1</aliyun-oss-v2.version>
         <commonmark.version>0.30.0</commonmark.version>
         <elasticsearch-java.version>9.2.1</elasticsearch-java.version>
+        <spring-ai.version>1.0.9</spring-ai.version>
     </properties>
 
     <dependencyManagement>
@@ -88,6 +90,11 @@
                 <artifactId>search</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.codesight</groupId>
+                <artifactId>ai</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- Third-party Dependencies -->
             <dependency>
@@ -134,6 +141,13 @@
                 <groupId>org.elasticsearch.client</groupId>
                 <artifactId>elasticsearch-rest-client</artifactId>
                 <version>${elasticsearch-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

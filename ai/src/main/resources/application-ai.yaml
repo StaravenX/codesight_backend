@@ -1,0 +1,12 @@
+spring:
+  ai:
+    openai:
+      base-url: ${OPENAI_BASE_URL}
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL}
+          temperature: 0.3
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL}
