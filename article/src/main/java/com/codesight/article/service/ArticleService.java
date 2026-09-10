@@ -6,6 +6,8 @@ import com.codesight.article.api.dto.request.ArticlePatchRequest;
 import com.codesight.article.api.dto.response.ArticleCreateResponse;
 import com.codesight.article.api.dto.response.ArticleDetailResponse;
 import com.codesight.article.api.dto.response.ArticlePatchResponse;
+import com.codesight.article.event.ArticleEventProducer;
+import com.codesight.article.event.ArticleSyncEvent;
 import com.codesight.article.mapper.*;
 import com.codesight.article.model.dto.ArticleDetailStatic;
 import com.codesight.article.model.entity.*;
@@ -47,6 +49,7 @@ public class ArticleService {
     private final ArticleCacheService articleCacheService;
     private final RecommendRankService recommendRankService;
     private final ArticleFeedService articleFeedService;
+    private final ArticleEventProducer articleEventProducer;
 
     @Transactional(rollbackFor = Exception.class)
     public ArticleCreateResponse createArticle(ArticleCreateRequest request, Long authorId) {
@@ -98,9 +101,10 @@ public class ArticleService {
         // 6. 保存标签多对多关联关系
         saveArticleTags(articleId, request.tagIds());
 
-        // 7. 若公开发布，加入推荐候选池并推拉分流关注流
+        // 7. 若公开发布，加入推荐候选池并推拉分流关注流，投递 Kafka 搜索同步事件
         if (status == ArticleStatus.PUBLISHED && article.getVisible() == ArticleVisible.PUBLIC) {
             articleFeedService.onArticlePublished(article);
+            articleEventProducer.sendSyncEvent(articleId, ArticleSyncEvent.Action.UPSERT);
         }
 
         log.info("文章创建成功: articleId={}, authorId={}, status={}", articleId, authorId, status);
@@ -187,6 +191,14 @@ public class ArticleService {
         articleMapper.updateById(article);
         // 更新数据库后，删除缓存
         articleCacheService.evictCache(articleId);
+
+        // 同步搜索索引：公开且已发布状态投递 UPSERT，否则投递 DELETE
+        if (article.getStatus() == ArticleStatus.PUBLISHED && article.getVisible() == ArticleVisible.PUBLIC) {
+            articleEventProducer.sendSyncEvent(articleId, ArticleSyncEvent.Action.UPSERT);
+        } else {
+            articleEventProducer.sendSyncEvent(articleId, ArticleSyncEvent.Action.DELETE);
+        }
+
         log.info("文章更新成功: articleId={}, authorId={}, status={}", articleId, authorId, article.getStatus());
 
         return new ArticlePatchResponse(articleId, article.getStatus());

@@ -17,6 +17,7 @@ import com.codesight.article.model.dto.ArticleDetailStatic;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import org.junit.jupiter.api.BeforeEach;
+import com.codesight.article.event.ArticleEventProducer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +58,9 @@ public class ArticleServiceTest {
 
     @Mock
     private ArticleFeedService articleFeedService;
+
+    @Mock
+    private ArticleEventProducer articleEventProducer;
 
     @InjectMocks
     private ArticleService articleService;
