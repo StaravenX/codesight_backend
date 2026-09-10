@@ -2,7 +2,7 @@ spring:
   application:
     name: codesight_backend
   profiles:
-    include: auth, storage
+    include: auth, storage, ai
   elasticsearch:
     uri: http://localhost:9200
   datasource:

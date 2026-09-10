@@ -65,6 +65,12 @@
             <groupId>com.codesight</groupId>
             <artifactId>search</artifactId>
         </dependency>
+
+        <!-- ai -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>ai</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
