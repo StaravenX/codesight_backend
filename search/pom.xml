@@ -30,6 +30,12 @@
             <artifactId>article</artifactId>
         </dependency>
 
+        <!-- User -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>user</artifactId>
+        </dependency>
+
         <!-- Elasticsearch -->
         <dependency>
             <groupId>co.elastic.clients</groupId>
