@@ -4,9 +4,11 @@ spring:
       base-url: ${OPENAI_BASE_URL}
       api-key: ${OPENAI_API_KEY}
       chat:
+        completions-path: /chat/completions
         options:
           model: ${OPENAI_CHAT_MODEL}
           temperature: 0.3
       embedding:
+        embeddings-path: /embeddings
         options:
           model: ${OPENAI_EMBEDDING_MODEL}
