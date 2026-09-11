@@ -27,6 +27,7 @@ public enum ErrorCode {
     ARTICLE_FORBIDDEN("ARTICLE_FORBIDDEN", "无权修改他人文章", 403),
     CANNOT_FOLLOW_SELF("CANNOT_FOLLOW_SELF", "不能关注自己", 400),
     FOLLOW_LIMIT_EXCEEDED("FOLLOW_LIMIT_EXCEEDED", "关注人数已达上限", 400),
+    AI_SERVICE_ERROR("AI_SERVICE_ERROR", "AI大模型服务异常，请稍后重试", 503),
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "服务器内部错误", 500);
 
     final String code;
