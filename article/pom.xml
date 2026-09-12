@@ -42,6 +42,12 @@
             <artifactId>relation</artifactId>
         </dependency>
 
+        <!-- ai -->
+        <dependency>
+            <groupId>com.codesight</groupId>
+            <artifactId>ai</artifactId>
+        </dependency>
+
         <!-- MyBatisPlus -->
         <dependency>
             <groupId>com.baomidou</groupId>

@@ -22,8 +22,30 @@ public record AiChatRequest(
         String question,
 
         @Schema(description = "多轮对话历史消息列表")
-        List<ChatMessage> chatHistory
+        List<ChatMessage> chatHistory,
+
+        @Schema(description = "文章上下文信息")
+        ArticleContext articleContext
 ) {
+    /**
+     * 文章上下文直传载荷
+     */
+    @Builder
+    @Schema(description = "文章上下文直传载荷")
+    public record ArticleContext(
+            @Schema(description = "文章标题")
+            String title,
+
+            @Schema(description = "文章摘要")
+            String summary,
+
+            @Schema(description = "文章标签列表")
+            List<String> tags,
+
+            @Schema(description = "文章正文内容")
+            String content
+    ) {}
+
     /**
      * 多轮对话单条消息体
      */

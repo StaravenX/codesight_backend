@@ -18,19 +18,6 @@
             <artifactId>common</artifactId>
         </dependency>
 
-        <!-- Search -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>search</artifactId>
-        </dependency>
-
-        <!-- Article -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>article</artifactId>
-        </dependency>
-
-
         <!-- Spring AI OpenAI Starter -->
         <dependency>
             <groupId>org.springframework.ai</groupId>

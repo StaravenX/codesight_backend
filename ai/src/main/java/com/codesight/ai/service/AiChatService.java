@@ -3,10 +3,6 @@ package com.codesight.ai.service;
 import com.codesight.ai.api.dto.AiChatRequest;
 import com.codesight.ai.api.dto.SuggestQuestionsRequest;
 import com.codesight.ai.api.dto.SuggestQuestionsResponse;
-import org.springframework.ai.openai.api.OpenAiApi;
-import com.codesight.article.api.dto.response.ArticleDetailResponse;
-import com.codesight.article.api.dto.response.TagResponse;
-import com.codesight.article.service.ArticleService;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -17,13 +13,13 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * AI 文章伴读与智能追问服务
@@ -61,7 +57,6 @@ public class AiChatService {
             """;
 
     private final ChatClient chatClient;
-    private final ArticleService articleService;
 
     /**
      * 流式问答
@@ -69,8 +64,8 @@ public class AiChatService {
     public Flux<OpenAiApi.ChatCompletionChunk> streamChat(AiChatRequest request) {
         Prompt prompt = buildPrompt(
                 DEFAULT_SYSTEM_PROMPT,
-                request.articleId(),
                 request.chatHistory(),
+                request.articleContext(),
                 "【用户提问】\n" + request.question()
         );
         return chatClient.prompt(prompt)
@@ -107,8 +102,8 @@ public class AiChatService {
     public SuggestQuestionsResponse suggestQuestions(SuggestQuestionsRequest request) {
         Prompt prompt = buildPrompt(
                 SUGGEST_QUESTIONS_PROMPT,
-                request.articleId(),
                 request.chatHistory(),
+                request.articleContext(),
                 "请基于上述背景与近期对话，严格按规则推荐 3 个技术追问短语："
         );
 
@@ -140,13 +135,13 @@ public class AiChatService {
     }
 
     /**
-     * 构造提示词
+     * 构造提示词（无状态上下文直传，零查库）
      */
-    private Prompt buildPrompt(String systemPrompt, Long articleId, List<AiChatRequest.ChatMessage> chatHistory, String finalInstruction) {
-        ArticleDetailResponse article = articleService.getDetail(articleId, null);
-        if (article == null) {
-            throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND);
-        }
+    private Prompt buildPrompt(
+            String systemPrompt,
+            List<AiChatRequest.ChatMessage> chatHistory,
+            AiChatRequest.ArticleContext context,
+            String finalInstruction) {
 
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(systemPrompt));
@@ -164,24 +159,25 @@ public class AiChatService {
             }
         }
 
-        // 注入文章上下文
+        // 注入文章上下文（前端直传上下文）
         StringBuilder userPrompt = new StringBuilder("【用户当前正在浏览的文章】\n");
-        userPrompt.append("标题：").append(article.getTitle()).append("\n");
-        if (article.getTags() != null && !article.getTags().isEmpty()) {
-            String tags = article.getTags().stream()
-                    .map(TagResponse::name)
-                    .collect(Collectors.joining("、"));
-            userPrompt.append("标签：").append(tags).append("\n");
-        }
-        if (article.getSummary() != null && !article.getSummary().isBlank()) {
-            userPrompt.append("摘要：").append(article.getSummary()).append("\n");
-        }
-        String contentMd = article.getContentMd();
-        if (contentMd != null && !contentMd.isBlank()) {
-            String snippet = contentMd.length() > MAX_ARTICLE_CONTENT_LENGTH
-                    ? contentMd.substring(0, MAX_ARTICLE_CONTENT_LENGTH) + "\n\n...(正文后续篇幅已省略)..."
-                    : contentMd;
-            userPrompt.append("正文切片：\n").append(snippet).append("\n\n");
+        if (context != null) {
+            if (context.title() != null && !context.title().isBlank()) {
+                userPrompt.append("标题：").append(context.title()).append("\n");
+            }
+            if (context.tags() != null && !context.tags().isEmpty()) {
+                userPrompt.append("标签：").append(String.join("、", context.tags())).append("\n");
+            }
+            if (context.summary() != null && !context.summary().isBlank()) {
+                userPrompt.append("摘要：").append(context.summary()).append("\n");
+            }
+            String contentMd = context.content();
+            if (contentMd != null && !contentMd.isBlank()) {
+                String snippet = contentMd.length() > MAX_ARTICLE_CONTENT_LENGTH
+                        ? contentMd.substring(0, MAX_ARTICLE_CONTENT_LENGTH) + "\n\n...(正文后续篇幅已省略)..."
+                        : contentMd;
+                userPrompt.append("正文切片：\n").append(snippet).append("\n\n");
+            }
         }
 
         userPrompt.append("请结合上述资料回答：\n").append(finalInstruction);
