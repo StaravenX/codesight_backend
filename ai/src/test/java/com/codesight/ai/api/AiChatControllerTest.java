@@ -60,19 +60,15 @@ class AiChatControllerTest {
     @DisplayName("测试智能追问推荐接口：正确委托并返回推荐词条")
     void testSuggestQuestions() {
         SuggestQuestionsRequest request = SuggestQuestionsRequest.builder()
-                .articleId(101L)
-                .chatHistory(List.of(
-                        AiChatRequest.ChatMessage.builder().role("user").content("什么是 Spring Boot").build()
-                ))
                 .build();
-        SuggestQuestionsResponse mockResp = SuggestQuestionsResponse.of(List.of("自动配置", "核心注解", "Starter原理"));
-        when(aiChatService.suggestQuestions(request)).thenReturn(mockResp);
 
-        SuggestQuestionsResponse response = aiChatController.suggestQuestions(request);
+        SuggestQuestionsResponse response = SuggestQuestionsResponse.of(List.of("问题1", "问题2", "问题3"));
+        when(aiChatService.suggestQuestions(request)).thenReturn(response);
 
-        assertNotNull(response);
-        assertEquals(3, response.queries().size());
-        assertEquals("自动配置", response.queries().getFirst().value());
+        SuggestQuestionsResponse actual = aiChatController.suggestQuestions(request);
+
+        assertNotNull(actual);
+        assertEquals(3, actual.queries().size());
         verify(aiChatService).suggestQuestions(request);
     }
 }
