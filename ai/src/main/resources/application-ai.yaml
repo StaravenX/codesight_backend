@@ -12,3 +12,15 @@ spring:
         embeddings-path: /embeddings
         options:
           model: ${OPENAI_EMBEDDING_MODEL}
+codesight:
+  ai:
+    # 推荐流语义负反馈剪枝配置
+    pruning-enabled: true
+    similarity-threshold: 0.85
+    # 推荐流正向偏好加权精排配置
+    ranking-enabled: true
+    similarity-weight: 0.4
+    base-score-weight: 0.6
+    # 用户正向/负向偏好样本最大滑动窗口大小
+    max-positive-anchors: 20
+    max-negative-anchors: 10
