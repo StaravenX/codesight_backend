@@ -38,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import com.codesight.article.model.enums.ArticleVisible;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +61,7 @@ public class ArticleFeedService {
     private final StringRedisTemplate stringRedisTemplate;
     private final UserFollowerMapper userFollowerMapper;
     private final RelationCacheService relationCacheService;
+    private final ArticleRecommendVectorService articleRecommendVectorService;
 
     /**
      * 获取文章信息流（推荐、最新、关注三大分支）
@@ -92,33 +94,50 @@ public class ArticleFeedService {
 
             List<TypedTuple<String>> tuples = recommendRankService.getRankedArticleIds(cursorRankScore, limitSize);
             if (!tuples.isEmpty()) {
-                List<Long> articleIds = tuples.stream()
-                        .map(t -> Long.parseLong(Objects.requireNonNull(t.getValue())))
-                        .toList();
+                Map<Long, Double> scoreMap = new HashMap<>(tuples.size());
+                List<Long> articleIds = new ArrayList<>(tuples.size());
+                for (TypedTuple<String> t : tuples) {
+                    if (t.getValue() != null) {
+                        Long id = Long.parseLong(t.getValue());
+                        articleIds.add(id);
+                        scoreMap.put(id, t.getScore() != null ? t.getScore() : 0.0);
+                    }
+                }
 
                 List<Article> dbArticles = articleMapper.selectByIds(articleIds);
                 if (dbArticles != null && !dbArticles.isEmpty()) {
+                    Map<Long, Article> articleMap = dbArticles.stream()
+                            .filter(a -> a != null && a.getStatus() == ArticleStatus.PUBLISHED && a.getVisible() == ArticleVisible.PUBLIC)
+                            .collect(Collectors.toMap(Article::getId, Function.identity(), (o1, o2) -> o1));
+
                     List<Article> sorted = new ArrayList<>(articleIds.size());
-                    for (Article a : dbArticles) {
-                        if (a != null && a.getStatus() == ArticleStatus.PUBLISHED && a.getVisible() == ArticleVisible.PUBLIC) {
+                    for (Long id : articleIds) {
+                        Article a = articleMap.get(id);
+                        if (a != null) {
+                            a.setRankScore(scoreMap.getOrDefault(id, 0.0));
                             sorted.add(a);
                         }
                     }
 
                     if (!sorted.isEmpty()) {
-                        boolean hasMore = sorted.size() > request.size();
-                        List<Article> paged = hasMore ? sorted.subList(0, request.size()) : sorted;
+                        // 双向向量感知推荐（负向语义剪枝 + 正向加权精排）
+                        List<Article> reranked = articleRecommendVectorService.recommendAndRerank(currentUserId, sorted);
 
-                        String nextCursor = null;
-                        if (hasMore && !paged.isEmpty()) {
-                            Article last = paged.getLast();
-                            Double lastScore = recommendRankService.getScore(last.getId());
-                            long scoreVal = lastScore != null ? lastScore.longValue() : 0L;
-                            nextCursor = buildCursor(CURSOR_PREFIX_RECOMMENDED, scoreVal, last.getId());
+                        if (!reranked.isEmpty()) {
+                            boolean hasMore = reranked.size() > request.size();
+                            List<Article> paged = hasMore ? reranked.subList(0, request.size()) : reranked;
+
+                            String nextCursor = null;
+                            if (hasMore && !paged.isEmpty()) {
+                                Article last = paged.getLast();
+                                Double lastScore = last.getRankScore();
+                                long scoreVal = lastScore != null ? lastScore.longValue() : 0L;
+                                nextCursor = buildCursor(CURSOR_PREFIX_RECOMMENDED, scoreVal, last.getId());
+                            }
+
+                            List<ArticleFeedItemResponse> items = hydrateFeedItems(paged, currentUserId);
+                            return new ArticleFeedPageResponse(items, nextCursor, hasMore);
                         }
-
-                        List<ArticleFeedItemResponse> items = hydrateFeedItems(paged, currentUserId);
-                        return new ArticleFeedPageResponse(items, nextCursor, hasMore);
                     }
                 }
             }
@@ -144,8 +163,15 @@ public class ArticleFeedService {
             return new ArticleFeedPageResponse(Collections.emptyList(), null, false);
         }
 
-        boolean hasMore = rawList.size() > request.size();
-        List<Article> articles = hasMore ? rawList.subList(0, request.size()) : rawList;
+        // 双向向量感知推荐（负向语义剪枝 + 正向加权精排）
+        List<Article> reranked = articleRecommendVectorService.recommendAndRerank(currentUserId, rawList);
+
+        if (reranked.isEmpty()) {
+            return new ArticleFeedPageResponse(Collections.emptyList(), null, false);
+        }
+
+        boolean hasMore = reranked.size() > request.size();
+        List<Article> articles = hasMore ? reranked.subList(0, request.size()) : reranked;
 
         String nextCursor = null;
         if (hasMore && !articles.isEmpty()) {

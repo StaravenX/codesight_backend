@@ -94,12 +94,17 @@ class ArticleFeedServiceTest {
     @Mock
     private SetOperations<String, String> setOperations;
 
+    @Mock
+    private ArticleRecommendVectorService articleRecommendVectorService;
+
     private ArticleFeedService articleFeedService;
 
     @BeforeEach
     void setUp() {
         when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
         when(stringRedisTemplate.opsForSet()).thenReturn(setOperations);
+        when(articleRecommendVectorService.recommendAndRerank(any(), anyList()))
+                .thenAnswer(inv -> inv.getArgument(1));
 
         articleFeedService = new ArticleFeedService(
                 articleMapper,
@@ -110,7 +115,8 @@ class ArticleFeedServiceTest {
                 recommendRankService,
                 stringRedisTemplate,
                 userFollowerMapper,
-                relationCacheService
+                relationCacheService,
+                articleRecommendVectorService
         );
     }
 
@@ -573,5 +579,64 @@ class ArticleFeedServiceTest {
                 .thenReturn(Collections.emptySet());
         articleFeedService.backfillOnDemotion(9999L);
         verify(userFollowerMapper, never()).selectList(any());
+    }
+
+    @Test
+    @DisplayName("全站推荐流接入双向向量感知：精排调换文章顺序并生效")
+    void testRecommendedFeed_WithVectorRerankApplied() {
+        Article a1 = createArticle(101L, 1L, 1L, Instant.now(), 100L, 10L);
+        Article a2 = createArticle(102L, 2L, 1L, Instant.now(), 200L, 20L);
+
+        List<TypedTuple<String>> tuples = List.of(
+                new DefaultTypedTuple<>("101", 1000.0),
+                new DefaultTypedTuple<>("102", 900.0)
+        );
+        when(recommendRankService.getRankedArticleIds(null, 11)).thenReturn(tuples);
+        when(articleMapper.selectByIds(List.of(101L, 102L))).thenReturn(List.of(a1, a2));
+ 
+        // 模拟 AI 模块精排：用户画像与 a2 契合度极高，重排为 [a2, a1]
+        Long currentUserId = 888L;
+        when(articleRecommendVectorService.recommendAndRerank(eq(currentUserId), anyList()))
+                .thenReturn(List.of(a2, a1));
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .sortBy(FeedSortType.RECOMMENDED)
+                .size(10)
+                .build();
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, currentUserId);
+
+        assertNotNull(response);
+        assertEquals(2, response.items().size());
+        assertEquals(102L, response.items().get(0).getId()); // a2 跃升至第一位
+        assertEquals(101L, response.items().get(1).getId());
+    }
+
+    @Test
+    @DisplayName("全站推荐流接入双向向量感知：负向语义剪枝剔除同质营销软文")
+    void testRecommendedFeed_WithSemanticPruningApplied() {
+        Article cleanArticle = createArticle(201L, 1L, 1L, Instant.now(), 100L, 10L);
+        Article softArticle = createArticle(202L, 2L, 1L, Instant.now(), 200L, 20L);
+
+        List<TypedTuple<String>> tuples = List.of(
+                new DefaultTypedTuple<>("201", 1000.0),
+                new DefaultTypedTuple<>("202", 950.0)
+        );
+        when(recommendRankService.getRankedArticleIds(null, 11)).thenReturn(tuples);
+        when(articleMapper.selectByIds(List.of(201L, 202L))).thenReturn(List.of(cleanArticle, softArticle));
+
+        // 模拟 AI 模块负向语义剪枝：剔除 202 同质营销软文，仅保留 201
+        Long currentUserId = 888L;
+        when(articleRecommendVectorService.recommendAndRerank(eq(currentUserId), anyList()))
+                .thenReturn(List.of(cleanArticle));
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .sortBy(FeedSortType.RECOMMENDED)
+                .size(10)
+                .build();
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, currentUserId);
+
+        assertNotNull(response);
+        assertEquals(1, response.items().size());
+        assertEquals(201L, response.items().getFirst().getId());
     }
 }
