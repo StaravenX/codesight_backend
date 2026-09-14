@@ -20,6 +20,7 @@ public class ArticleSearchKafkaConsumer {
 
     @KafkaListener(topics = ArticleSyncEvent.TOPIC, groupId = "codesight-search-sync")
     public void onMessage(ArticleSyncEvent event, Acknowledgment ack) {
+        // 同步更新es索引
         try {
             if (event == null || event.articleId() == null || event.action() == null) {
                 if (ack != null) {
@@ -38,6 +39,24 @@ public class ArticleSearchKafkaConsumer {
             }
         } catch (Exception e) {
             log.error("消费文章搜索同步 Kafka 事件异常, event={}", event, e);
+            if (ack != null) {
+                ack.acknowledge();
+            }
+        }
+    }
+
+    // 同步文章向量至es
+    @KafkaListener(topics = ArticleSyncEvent.TOPIC_VECTOR, groupId = "codesight-search-vector-sync")
+    public void onVectorMessage(ArticleSyncEvent event, Acknowledgment ack) {
+        try {
+            if (event != null && event.articleId() != null && event.action() == ArticleSyncEvent.Action.UPSERT) {
+                searchIndexService.updateArticleVector(event.articleId());
+            }
+            if (ack != null) {
+                ack.acknowledge();
+            }
+        } catch (Exception e) {
+            log.error("消费文章向量同步 Kafka 事件异常, event={}", event, e);
             if (ack != null) {
                 ack.acknowledge();
             }

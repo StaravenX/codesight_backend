@@ -25,6 +25,9 @@ class ArticleVectorKafkaConsumerTest {
     private ArticleVectorService articleVectorService;
 
     @Mock
+    private ArticleEventProducer articleEventProducer;
+
+    @Mock
     private Acknowledgment ack;
 
     @InjectMocks
@@ -43,6 +46,12 @@ class ArticleVectorKafkaConsumerTest {
                 .build();
 
         when(articleMapper.selectById(articleId)).thenReturn(article);
+        when(articleVectorService.generateAndSaveVector(
+                articleId,
+                "Java 21 虚拟线程深度解析",
+                "核心摘要",
+                "正文内容..."
+        )).thenReturn(new float[]{0.1f, 0.2f});
 
         ArticleSyncEvent event = new ArticleSyncEvent(articleId, ArticleSyncEvent.Action.UPSERT);
         consumer.onMessage(event, ack);
@@ -53,6 +62,7 @@ class ArticleVectorKafkaConsumerTest {
                 "核心摘要",
                 "正文内容..."
         );
+        verify(articleEventProducer, times(1)).sendVectorSyncEvent(articleId, ArticleSyncEvent.Action.UPSERT);
         verify(articleVectorService, never()).deleteArticleVector(any());
         verify(ack, times(1)).acknowledge();
     }
@@ -75,6 +85,7 @@ class ArticleVectorKafkaConsumerTest {
         consumer.onMessage(event, ack);
 
         verify(articleVectorService, times(1)).deleteArticleVector(articleId);
+        verify(articleEventProducer, times(1)).sendVectorSyncEvent(articleId, ArticleSyncEvent.Action.DELETE);
         verify(articleVectorService, never()).generateAndSaveVector(any(), any(), any(), any());
         verify(ack, times(1)).acknowledge();
     }
@@ -88,6 +99,7 @@ class ArticleVectorKafkaConsumerTest {
         consumer.onMessage(event, ack);
 
         verify(articleVectorService, times(1)).deleteArticleVector(articleId);
+        verify(articleEventProducer, times(1)).sendVectorSyncEvent(articleId, ArticleSyncEvent.Action.DELETE);
         verify(articleVectorService, never()).generateAndSaveVector(any(), any(), any(), any());
         verify(ack, times(1)).acknowledge();
     }
@@ -100,6 +112,7 @@ class ArticleVectorKafkaConsumerTest {
         consumer.onMessage(event, ack);
 
         verify(articleVectorService, times(1)).deleteArticleVector(articleId);
+        verify(articleEventProducer, times(1)).sendVectorSyncEvent(articleId, ArticleSyncEvent.Action.DELETE);
         verifyNoInteractions(articleMapper);
         verify(ack, times(1)).acknowledge();
     }

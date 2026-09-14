@@ -1,12 +1,7 @@
 package com.codesight.search.index;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch._types.mapping.DateProperty;
-import co.elastic.clients.elasticsearch._types.mapping.IntegerNumberProperty;
-import co.elastic.clients.elasticsearch._types.mapping.KeywordProperty;
-import co.elastic.clients.elasticsearch._types.mapping.LongNumberProperty;
-import co.elastic.clients.elasticsearch._types.mapping.Property;
-import co.elastic.clients.elasticsearch._types.mapping.TextProperty;
+import co.elastic.clients.elasticsearch._types.mapping.*;
 import com.codesight.search.config.EsProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +46,11 @@ public class SearchIndexInitializer {
                     .properties("favorite_count", Property.of(p -> p.integer(IntegerNumberProperty.of(b -> b))))
                     .properties("view_count", Property.of(p -> p.integer(IntegerNumberProperty.of(b -> b))))
                     .properties("status", Property.of(p -> p.keyword(KeywordProperty.of(b -> b))))
+                    .properties("article_vector", Property.of(p -> p.denseVector(DenseVectorProperty.of(b -> b
+                            .dims(props.getVectorDims())
+                            .index(true)
+                            .similarity(DenseVectorSimilarity.Cosine)
+                    ))))
             ));
         } catch (Exception e) {
             log.warn("创建 Elasticsearch 索引 [{}] 失败：{}", indexName, e.getMessage());

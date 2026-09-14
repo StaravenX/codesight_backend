@@ -73,4 +73,22 @@ class ArticleSearchKafkaConsumerTest {
         verify(searchIndexService, times(1)).upsertArticle(1001L);
         verify(ack, times(1)).acknowledge();
     }
+
+    @Test
+    void shouldCallUpdateArticleVectorWhenVectorActionIsUpsert() {
+        ArticleSyncEvent event = new ArticleSyncEvent(1001L, ArticleSyncEvent.Action.UPSERT);
+
+        consumer.onVectorMessage(event, ack);
+
+        verify(searchIndexService, times(1)).updateArticleVector(1001L);
+        verify(ack, times(1)).acknowledge();
+    }
+
+    @Test
+    void shouldHandleNullVectorEventGracefully() {
+        consumer.onVectorMessage(null, ack);
+
+        verifyNoInteractions(searchIndexService);
+        verify(ack, times(1)).acknowledge();
+    }
 }

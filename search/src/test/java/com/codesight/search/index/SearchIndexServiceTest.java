@@ -6,6 +6,8 @@ import co.elastic.clients.elasticsearch.core.BulkResponse;
 import co.elastic.clients.elasticsearch.core.CountResponse;
 import co.elastic.clients.elasticsearch.core.DeleteResponse;
 import co.elastic.clients.elasticsearch.core.IndexResponse;
+import co.elastic.clients.elasticsearch.core.UpdateResponse;
+import com.codesight.ai.service.ArticleVectorService;
 import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.mapper.ArticleTagRelMapper;
 import com.codesight.article.mapper.TagMapper;
@@ -62,12 +64,16 @@ class SearchIndexServiceTest {
     @Mock
     private CounterService counterService;
 
+    @Mock
+    private ArticleVectorService articleVectorService;
+
     @InjectMocks
     private SearchIndexService searchIndexService;
 
     @BeforeEach
     void setUp() {
         lenient().when(props.getIndex()).thenReturn("codesight_article_index");
+        lenient().when(props.getVectorDims()).thenReturn(1536);
     }
 
     @Test
@@ -235,5 +241,99 @@ class SearchIndexServiceTest {
         doThrow(new RuntimeException("ES连接异常")).when(es).count(any(Function.class));
 
         assertDoesNotThrow(() -> searchIndexService.ensureBackfill());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldUpsertArticleWithValidVectorSuccessfully() throws IOException {
+        Long articleId = 2001L;
+        Article article = Article.builder()
+                .id(articleId)
+                .title("Spring AI 实战")
+                .contentMd("正文")
+                .summary("摘要")
+                .authorId(888L)
+                .status(ArticleStatus.PUBLISHED)
+                .visible(ArticleVisible.PUBLIC)
+                .publishTime(Instant.now())
+                .build();
+
+        when(articleMapper.selectById(articleId)).thenReturn(article);
+        when(articleTagRelMapper.selectList(any())).thenReturn(List.of());
+        when(userCacheService.getUserBaseInfo(888L)).thenReturn(new UserBaseInfo(888L, "作者", null, null, null, null));
+        when(counterService.getCounts(any(), any())).thenReturn(Map.of());
+
+        float[] mockVector = new float[1536];
+        mockVector[0] = 0.88f;
+        when(articleVectorService.batchGetArticleVector(List.of(articleId)))
+                .thenReturn(Map.of(articleId, mockVector));
+
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        doReturn(mockIndexResponse).when(es).index(any(Function.class));
+
+        searchIndexService.upsertArticle(articleId);
+
+        verify(es, times(1)).index(any(Function.class));
+        verify(articleVectorService, never()).generateAndSaveVector(any(), any(), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldUpsertArticleWithoutVectorWhenCacheMissedDuringUpsert() throws IOException {
+        Long articleId = 2002L;
+        Article article = Article.builder()
+                .id(articleId)
+                .title("大模型向量")
+                .contentMd("内容")
+                .summary("摘要")
+                .authorId(888L)
+                .status(ArticleStatus.PUBLISHED)
+                .visible(ArticleVisible.PUBLIC)
+                .publishTime(Instant.now())
+                .build();
+
+        when(articleMapper.selectById(articleId)).thenReturn(article);
+        when(articleTagRelMapper.selectList(any())).thenReturn(List.of());
+        when(userCacheService.getUserBaseInfo(888L)).thenReturn(new UserBaseInfo(888L, "作者", null, null, null, null));
+        when(counterService.getCounts(any(), any())).thenReturn(Map.of());
+
+        when(articleVectorService.batchGetArticleVector(List.of(articleId))).thenReturn(Map.of());
+
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        doReturn(mockIndexResponse).when(es).index(any(Function.class));
+
+        searchIndexService.upsertArticle(articleId);
+
+        verify(articleVectorService, never()).generateAndSaveVector(any(), any(), any(), any());
+        verify(es, times(1)).index(any(Function.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldUpdateArticleVectorSuccessfully() throws IOException {
+        Long articleId = 2003L;
+        float[] validVector = new float[1536];
+        when(props.getVectorDims()).thenReturn(1536);
+        when(articleVectorService.batchGetArticleVector(List.of(articleId)))
+                .thenReturn(Map.of(articleId, validVector));
+
+        UpdateResponse mockUpdateResponse = mock(UpdateResponse.class);
+        doReturn(mockUpdateResponse).when(es).update(any(Function.class), eq(Map.class));
+
+        searchIndexService.updateArticleVector(articleId);
+
+        verify(es, times(1)).update(any(Function.class), eq(Map.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldSkipUpdateArticleVectorWhenDimsMismatchOrNull() throws IOException {
+        Long articleId = 2004L;
+        when(articleVectorService.batchGetArticleVector(List.of(articleId))).thenReturn(Map.of());
+
+        searchIndexService.updateArticleVector(articleId);
+        searchIndexService.updateArticleVector(null);
+
+        verify(es, never()).update(any(Function.class), any(Class.class));
     }
 }

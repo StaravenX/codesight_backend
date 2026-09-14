@@ -1,6 +1,7 @@
 package com.codesight.search.api;
 
 import com.codesight.common.annotation.CurrentUserId;
+import com.codesight.common.annotation.RateLimit;
 import com.codesight.search.api.dto.request.SearchRequest;
 import com.codesight.search.api.dto.response.SearchResponse;
 import com.codesight.search.service.SearchService;
@@ -32,6 +33,7 @@ public class SearchController {
      * 关键词检索
      */
     @GetMapping
+    @RateLimit(maxRequests = 120)
     @Operation(summary = "关键词全文检索", description = "支持相关性 + 点赞阅读平滑加权，支持标签筛选、游标深度分页与关键词高亮")
     public SearchResponse search(
             @Valid @ModelAttribute SearchRequest request,

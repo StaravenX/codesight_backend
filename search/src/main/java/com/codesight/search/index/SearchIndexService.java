@@ -4,6 +4,7 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.Refresh;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.codesight.ai.service.ArticleVectorService;
 import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.mapper.ArticleTagRelMapper;
 import com.codesight.article.mapper.TagMapper;
@@ -43,6 +44,7 @@ public class SearchIndexService {
     private final TagMapper tagMapper;
     private final UserCacheService userCacheService;
     private final CounterService counterService;
+    private final ArticleVectorService articleVectorService;
 
     /**
      * 服务冷启动时，若 ES 索引为空则从数据库批量回灌已发布文章
@@ -105,14 +107,18 @@ public class SearchIndexService {
                 articleIdStrs
         );
 
+        // 4. 批量向量装配
+        Map<Long, float[]> vectorMap = articleVectorService.batchGetArticleVector(articleIds);
+
         BulkRequest.Builder br = new BulkRequest.Builder();
         for (Article a : articles) {
             String strId = String.valueOf(a.getId());
             UserBaseInfo author = authorMap.get(a.getAuthorId());
             List<String> tags = tagMap.getOrDefault(a.getId(), Collections.emptyList());
             Map<CounterSchema.MetricItem, Long> counts = countsMap.getOrDefault(strId, Collections.emptyMap());
+            float[] vector = vectorMap.get(a.getId());
 
-            ArticleSearchDoc doc = buildDoc(a, author, tags, counts);
+            ArticleSearchDoc doc = buildDoc(a, author, tags, counts, vector);
 
             br.operations(op -> op.index(idx -> idx
                     .index(props.getIndex())
@@ -152,7 +158,8 @@ public class SearchIndexService {
                     String.valueOf(articleId)
             );
 
-            ArticleSearchDoc doc = buildDoc(article, author, tags, counts);
+            float[] vector = articleVectorService.batchGetArticleVector(List.of(articleId)).get(articleId);
+            ArticleSearchDoc doc = buildDoc(article, author, tags, counts, vector);
 
             es.index(i -> i
                     .index(props.getIndex())
@@ -163,6 +170,31 @@ public class SearchIndexService {
 
         } catch (Exception e) {
             log.error("ES 同步文章失败: articleId={}, error={}", articleId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 局部更新 ES 文章向量资产
+     *
+     * @param articleId 文章 ID
+     */
+    public void updateArticleVector(Long articleId) {
+        if (articleId == null) {
+            return;
+        }
+        try {
+            float[] vector = articleVectorService.batchGetArticleVector(List.of(articleId)).get(articleId);
+            if (vector == null || vector.length != props.getVectorDims()) {
+                return;
+            }
+            es.update(u -> u
+                    .index(props.getIndex())
+                    .id(String.valueOf(articleId))
+                    .doc(Map.of("article_vector", vector)),
+                    Map.class
+            );
+        } catch (Exception e) {
+            log.warn("ES 局部更新文章向量失败: articleId={}, error={}", articleId, e.getMessage());
         }
     }
 
@@ -188,11 +220,13 @@ public class SearchIndexService {
     private ArticleSearchDoc buildDoc(Article article,
                                       UserBaseInfo author,
                                       List<String> tags,
-                                      Map<CounterSchema.MetricItem, Long> counts) {
+                                      Map<CounterSchema.MetricItem, Long> counts,
+                                      float[] vector) {
         long likeCount = counts != null ? counts.getOrDefault(CounterSchema.ArticleMetric.LIKE, 0L) : 0L;
         long favoriteCount = counts != null ? counts.getOrDefault(CounterSchema.ArticleMetric.FAVORITE, 0L) : 0L;
         long fallbackView = article.getViewCount() != null ? article.getViewCount() : 0L;
         long viewCount = counts != null ? counts.getOrDefault(CounterSchema.ArticleMetric.VIEWS, fallbackView) : fallbackView;
+        float[] validVector = (vector != null && vector.length == props.getVectorDims()) ? vector : null;
 
         return ArticleSearchDoc.builder()
                 .articleId(article.getId())
@@ -209,6 +243,7 @@ public class SearchIndexService {
                 .favoriteCount(favoriteCount)
                 .viewCount(viewCount)
                 .status("published")
+                .articleVector(validVector)
                 .build();
     }
 
