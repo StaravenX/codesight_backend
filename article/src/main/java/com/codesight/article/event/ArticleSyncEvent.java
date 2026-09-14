@@ -9,6 +9,7 @@ public record ArticleSyncEvent(
         Action action
 ) {
     public static final String TOPIC = "article-search-sync";
+    public static final String TOPIC_VECTOR = "article-vector-sync";
 
     public enum Action {
         UPSERT,

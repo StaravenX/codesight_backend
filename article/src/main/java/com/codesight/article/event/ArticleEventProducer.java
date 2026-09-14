@@ -34,4 +34,23 @@ public class ArticleEventProducer {
                     }
                 });
     }
+
+    /**
+     * 发送文章向量同步事件
+     */
+    public void sendVectorSyncEvent(Long articleId, ArticleSyncEvent.Action action) {
+        if (articleId == null || action == null) {
+            return;
+        }
+        String partitionKey = String.valueOf(articleId);
+        ArticleSyncEvent event = new ArticleSyncEvent(articleId, action);
+
+        kafkaTemplate.send(ArticleSyncEvent.TOPIC_VECTOR, partitionKey, event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Kafka 文章向量同步事件投递失败: articleId={}, action={}, error={}",
+                                articleId, action, ex.getMessage(), ex);
+                    }
+                });
+    }
 }

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 监听 Kafka 文章变更事件，异步生成或清除文章向量资产
+ * 若文章向量更新并存储Redis成功，发送相应消息至下游消费者，以同步向量至es
  */
 @Slf4j
 @Component
@@ -21,6 +22,7 @@ public class ArticleVectorKafkaConsumer {
 
     private final ArticleMapper articleMapper;
     private final ArticleVectorService articleVectorService;
+    private final ArticleEventProducer articleEventProducer;
 
     @KafkaListener(topics = ArticleSyncEvent.TOPIC, groupId = "codesight-article-vector-sync")
     public void onMessage(ArticleSyncEvent event, Acknowledgment ack) {
@@ -32,7 +34,10 @@ public class ArticleVectorKafkaConsumer {
 
             switch (event.action()) {
                 case UPSERT -> handleUpsert(event.articleId());
-                case DELETE -> articleVectorService.deleteArticleVector(event.articleId());
+                case DELETE -> {
+                    articleVectorService.deleteArticleVector(event.articleId());
+                    articleEventProducer.sendVectorSyncEvent(event.articleId(), ArticleSyncEvent.Action.DELETE);
+                }
             }
 
             acknowledge(ack);
@@ -45,12 +50,18 @@ public class ArticleVectorKafkaConsumer {
     private void handleUpsert(Long articleId) {
         Article article = articleMapper.selectById(articleId);
         if (article != null && article.getStatus() == ArticleStatus.PUBLISHED && article.getVisible() == ArticleVisible.PUBLIC) {
-            articleVectorService.generateAndSaveVector(
+            float[] vector = articleVectorService.generateAndSaveVector(
                     article.getId(),
                     article.getTitle(),
                     article.getSummary(),
                     article.getContentMd()
             );
+            if (vector != null && vector.length > 0) {
+                articleEventProducer.sendVectorSyncEvent(articleId, ArticleSyncEvent.Action.UPSERT);
+            }
+        } else {
+            articleVectorService.deleteArticleVector(articleId);
+            articleEventProducer.sendVectorSyncEvent(articleId, ArticleSyncEvent.Action.DELETE);
         }
     }
 

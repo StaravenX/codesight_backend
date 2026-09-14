@@ -25,6 +25,7 @@ public record ArticleSearchDoc(
         @JsonProperty("like_count") Long likeCount,
         @JsonProperty("favorite_count") Long favoriteCount,
         @JsonProperty("view_count") Long viewCount,
-        @JsonProperty("status") String status
+        @JsonProperty("status") String status,
+        @JsonProperty("article_vector") float[] articleVector
 ) {
 }

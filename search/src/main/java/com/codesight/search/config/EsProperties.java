@@ -24,6 +24,10 @@ public class EsProperties {
     /**
      * 默认文章搜索索引名
      */
-    private String index = "codesight_article_index";
+    private String index;
 
+    /**
+     * 文章向量维度
+     */
+    private int vectorDims;
 }
