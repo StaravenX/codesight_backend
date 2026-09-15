@@ -1,0 +1,6 @@
+codesight:
+  search:
+    index: "codesight_article_index"
+    vector-dims: 1536
+    hybrid-enabled: true
+    embedding-timeout-ms: 300

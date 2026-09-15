@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
 @Configuration
-@EnableConfigurationProperties(EsProperties.class)
+@EnableConfigurationProperties({EsProperties.class, SearchProperties.class})
 @RequiredArgsConstructor
 public class ElasticsearchConfig {
 
