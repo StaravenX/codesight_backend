@@ -15,7 +15,7 @@ import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.ArticleVisible;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
-import com.codesight.search.config.EsProperties;
+import com.codesight.search.config.SearchProperties;
 import com.codesight.user.UserBaseInfo;
 import com.codesight.user.UserCacheService;
 import jakarta.annotation.PostConstruct;
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class SearchIndexService {
 
     private final ElasticsearchClient es;
-    private final EsProperties props;
+    private final SearchProperties props;
     private final ArticleMapper articleMapper;
     private final ArticleTagRelMapper articleTagRelMapper;
     private final TagMapper tagMapper;

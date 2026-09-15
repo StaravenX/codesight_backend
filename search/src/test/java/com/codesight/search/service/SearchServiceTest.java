@@ -9,7 +9,7 @@ import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import com.codesight.search.api.dto.request.SearchRequest;
-import com.codesight.search.config.EsProperties;
+import com.codesight.search.config.SearchProperties;
 import com.codesight.search.index.ArticleSearchDoc;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,10 +36,13 @@ class SearchServiceTest {
     private ElasticsearchClient es;
 
     @Mock
-    private EsProperties props;
+    private SearchProperties props;
 
     @Mock
     private CounterService counterService;
+
+    @Mock
+    private org.springframework.ai.embedding.EmbeddingModel embeddingModel;
 
     @InjectMocks
     private SearchService searchService;
@@ -47,6 +50,10 @@ class SearchServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(props.getIndex()).thenReturn("codesight_article_index");
+        lenient().when(props.isHybridEnabled()).thenReturn(true);
+        lenient().when(props.getVectorDims()).thenReturn(1536);
+        lenient().when(props.getEmbeddingTimeoutMs()).thenReturn(300L);
+        lenient().when(embeddingModel.embed(anyString())).thenReturn(new float[1536]);
     }
 
     @Test
@@ -233,5 +240,61 @@ class SearchServiceTest {
         assertTrue(response.items().isEmpty());
         assertNull(response.after());
         assertFalse(response.hasMore());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldSkipEmbeddingForGuestUser() throws IOException {
+        SearchRequest request = new SearchRequest("Java", 20, null);
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of());
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        // 游客未登录 currentUserId = null
+        searchService.search(request, null);
+
+        verify(embeddingModel, never()).embed(anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldFallbackGracefullyWhenEmbeddingThrowsException() throws IOException {
+        SearchRequest request = new SearchRequest("Java", 20, null);
+        when(embeddingModel.embed("Java")).thenThrow(new RuntimeException("Embedding API 429 Too Many Requests"));
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of());
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        // 登录用户即使大模型异常也正常返回，不报错
+        com.codesight.search.api.dto.response.SearchResponse response = searchService.search(request, 888L);
+
+        assertNotNull(response);
+        verify(es, times(1)).search(any(Function.class), eq(ArticleSearchDoc.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldSkipEmbeddingWhenHybridDisabled() throws IOException {
+        SearchRequest request = new SearchRequest("Java", 20, null);
+        when(props.isHybridEnabled()).thenReturn(false);
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of());
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        searchService.search(request, 888L);
+
+        verify(embeddingModel, never()).embed(anyString());
     }
 }

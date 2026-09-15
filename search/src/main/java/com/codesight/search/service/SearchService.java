@@ -16,15 +16,19 @@ import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import com.codesight.search.api.dto.request.SearchRequest;
 import com.codesight.search.api.dto.response.SearchResponse;
-import com.codesight.search.config.EsProperties;
+import com.codesight.search.config.SearchProperties;
 import com.codesight.search.index.ArticleSearchDoc;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -40,8 +44,9 @@ import java.util.stream.Stream;
 public class SearchService {
 
     private final ElasticsearchClient es;
-    private final EsProperties props;
+    private final SearchProperties props;
     private final CounterService counterService;
+    private final EmbeddingModel embeddingModel;
 
     /**
      * 关键词全文检索
@@ -78,6 +83,10 @@ public class SearchService {
                 .boostMode(FunctionBoostMode.Sum)
         ));
 
+        // 3. 登录用户提取查询向量，包含超时熔断与异常降级保护
+        float[] queryVector = extractQueryVectorSafely(q, currentUserIdNullable);
+        boolean hasVector = queryVector != null && queryVector.length == props.getVectorDims();
+
         try {
             var resp = es.search(s -> {
                 s.index(indexName)
@@ -87,11 +96,29 @@ public class SearchService {
                                 NamedValue.of("title", HighlightField.of(hf -> hf)),
                                 NamedValue.of("summary", HighlightField.of(hf -> hf)),
                                 NamedValue.of("body", HighlightField.of(hf -> hf))
-                        ))
-                        .sort(sorts);
+                        ));
 
-                if (afterValues != null && !afterValues.isEmpty()) {
-                    s.searchAfter(afterValues);
+                if (hasVector) {
+                    List<Float> vectorList = new ArrayList<>(queryVector.length);
+                    for (float f : queryVector) {
+                        vectorList.add(f);
+                    }
+                    s.knn(k -> k
+                            .field("article_vector")
+                            .queryVector(vectorList)
+                            .k(size)
+                            .numCandidates(Math.max(50, size * 2))
+                            .filter(f -> f.term(t -> t.field("status").value(v -> v.stringValue("published"))))
+                    );
+                    s.rank(r -> r.rrf(rrf -> rrf
+                            .rankConstant(60L)
+                            .rankWindowSize((long) Math.max(50, size * 2))
+                    ));
+                } else {
+                    s.sort(sorts);
+                    if (afterValues != null && !afterValues.isEmpty()) {
+                        s.searchAfter(afterValues);
+                    }
                 }
                 return s;
             }, ArticleSearchDoc.class);
@@ -233,5 +260,26 @@ public class SearchService {
                 .flatMap(List::stream)
                 .collect(Collectors.joining(" "));
         return snippet.isBlank() ? null : snippet;
+    }
+
+    /**
+     * 安全提取用户查询向量
+     */
+    private float[] extractQueryVectorSafely(String q, Long currentUserId) {
+        if (currentUserId == null || currentUserId <= 0) {
+            return null;
+        }
+        if (!props.isHybridEnabled() || q == null || q.isBlank()) {
+            return null;
+        }
+        try {
+            return CompletableFuture.supplyAsync(() -> embeddingModel.embed(q.trim()))
+                    .get(props.getEmbeddingTimeoutMs(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            log.warn("查询向量化超时 ({}ms)，降级为 BM25 检索: q={}", props.getEmbeddingTimeoutMs(), q);
+        } catch (Exception e) {
+            log.warn("查询向量化失败，降级为 BM25 检索: q={}, error={}", q, e.getMessage());
+        }
+        return null;
     }
 }

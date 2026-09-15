@@ -2,7 +2,7 @@ package com.codesight.search.index;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.mapping.*;
-import com.codesight.search.config.EsProperties;
+import com.codesight.search.config.SearchProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class SearchIndexInitializer {
 
     private final ElasticsearchClient es;
-    private final EsProperties props;
+    private final SearchProperties props;
 
     private static final String ANALYZER = "cjk";
 

@@ -3,6 +3,9 @@ package com.codesight.search.config;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * Elasticsearch 基础设施连接属性
+ */
 @Data
 @ConfigurationProperties(prefix = "spring.elasticsearch")
 public class EsProperties {
@@ -20,14 +23,4 @@ public class EsProperties {
      * 密码
      */
     private String password;
-
-    /**
-     * 默认文章搜索索引名
-     */
-    private String index;
-
-    /**
-     * 文章向量维度
-     */
-    private int vectorDims;
 }

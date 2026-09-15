@@ -18,7 +18,7 @@ import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.ArticleVisible;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
-import com.codesight.search.config.EsProperties;
+import com.codesight.search.config.SearchProperties;
 import com.codesight.user.UserBaseInfo;
 import com.codesight.user.UserCacheService;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +47,7 @@ class SearchIndexServiceTest {
     private ElasticsearchClient es;
 
     @Mock
-    private EsProperties props;
+    private SearchProperties props;
 
     @Mock
     private ArticleMapper articleMapper;
