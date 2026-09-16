@@ -27,6 +27,7 @@ public class RecommendRankService {
     public static final int DEFAULT_MAX_CAPACITY = 3000;
     public static final double DEFAULT_DECAY_FACTOR = 0.9;
     public static final double BASE_INITIAL_SCORE = 10.0;
+    public static final double MIN_SCORE_THRESHOLD = 1.0;
 
     private final StringRedisTemplate redis;
     private final RedisScript<Long> decayScript;
@@ -39,10 +40,10 @@ public class RecommendRankService {
     }
 
     /**
-     * 原子推高文章在推荐池中的排序分（若不存在则赋予底分）
+     * 原子变更文章在推荐池中的排序分（若不存在则赋予底分）
      *
      * @param articleId 文章全局唯一 ID
-     * @param delta     本次互动权重增量
+     * @param delta     本次互动权重变量
      */
     public void addOrIncrScore(Long articleId, double delta) {
         if (articleId == null) {
@@ -51,11 +52,19 @@ public class RecommendRankService {
         String member = String.valueOf(articleId);
         try {
             Double currentScore = redis.opsForZSet().score(RECOMMEND_POOL_KEY, member);
+            // 文章不在推荐池中
             if (currentScore == null) {
+                // 过滤负向互动
+                if (delta < 0) {
+                    return;
+                }
                 // 首次入池，赋予基础起跑分 + 增量分
                 redis.opsForZSet().add(RECOMMEND_POOL_KEY, member, BASE_INITIAL_SCORE + delta);
             } else {
-                redis.opsForZSet().incrementScore(RECOMMEND_POOL_KEY, member, delta);
+                Double newScore = redis.opsForZSet().incrementScore(RECOMMEND_POOL_KEY, member, delta);
+                if (newScore != null && newScore < MIN_SCORE_THRESHOLD) {
+                    redis.opsForZSet().remove(RECOMMEND_POOL_KEY, member);
+                }
             }
         } catch (Exception e) {
             log.warn("更新推荐候选池分数失败, articleId={}, delta={}", articleId, delta, e);
