@@ -50,11 +50,38 @@ class RecommendRankServiceTest {
     @DisplayName("测试已有文章：执行原子自增")
     void testAddOrIncrScoreExistingItem() {
         when(zSetOperations.score(RecommendRankService.RECOMMEND_POOL_KEY, "1001")).thenReturn(20.0);
+        when(zSetOperations.incrementScore(RecommendRankService.RECOMMEND_POOL_KEY, "1001", 5.0)).thenReturn(25.0);
 
         service.addOrIncrScore(1001L, 5.0);
 
         verify(zSetOperations).incrementScore(RecommendRankService.RECOMMEND_POOL_KEY, "1001", 5.0);
     }
+
+    @Test
+    @DisplayName("防反向唤醒：沉寂出池文章遇到负向互动（如取消点赞）严禁反向入池")
+    void testAddOrIncrScore_NegativeDeltaWhenOutOfPool_ShouldNotWakeUp() {
+        when(zSetOperations.score(RecommendRankService.RECOMMEND_POOL_KEY, "1001")).thenReturn(null);
+
+        // 用户取消点赞产生了负增量 -5.0
+        service.addOrIncrScore(1001L, -5.0);
+
+        // 验证绝对不能执行 add 入池操作
+        verify(zSetOperations, never()).add(anyString(), anyString(), anyDouble());
+        verify(zSetOperations, never()).incrementScore(anyString(), anyString(), anyDouble());
+    }
+
+    @Test
+    @DisplayName("池内扣分清退：池内文章扣减后分值跌破推荐池下限，自动物理移除")
+    void testAddOrIncrScore_ScoreDecreasesBelowThreshold_ShouldRemove() {
+        when(zSetOperations.score(RecommendRankService.RECOMMEND_POOL_KEY, "1001")).thenReturn(3.0);
+        when(zSetOperations.incrementScore(RecommendRankService.RECOMMEND_POOL_KEY, "1001", -5.0)).thenReturn(0.8);
+
+        service.addOrIncrScore(1001L, -5.0);
+
+        verify(zSetOperations).incrementScore(RecommendRankService.RECOMMEND_POOL_KEY, "1001", -5.0);
+        verify(zSetOperations).remove(RecommendRankService.RECOMMEND_POOL_KEY, "1001");
+    }
+
 
     @Test
     @DisplayName("测试首屏拉取推荐池：直接按绝对排位切片")
