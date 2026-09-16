@@ -1,5 +1,8 @@
 package com.codesight.article.service;
 
+import com.codesight.article.mapper.ArticleMapper;
+import com.codesight.article.model.entity.Article;
+import com.codesight.article.model.enums.ArticleStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,10 +34,12 @@ public class RecommendRankService {
     public static final double MIN_SCORE_THRESHOLD = 1.0;
 
     private final StringRedisTemplate redis;
+    private final ArticleMapper articleMapper;
     private final RedisScript<Long> decayScript;
 
-    public RecommendRankService(StringRedisTemplate redis) {
+    public RecommendRankService(StringRedisTemplate redis, ArticleMapper articleMapper) {
         this.redis = redis;
+        this.articleMapper = articleMapper;
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setLocation(new ClassPathResource("lua/decay_script.lua"));
         this.decayScript = script;
@@ -59,8 +64,16 @@ public class RecommendRankService {
                 if (delta < 0) {
                     return;
                 }
-                // 首次入池，赋予基础起跑分 + 增量分
-                redis.opsForZSet().add(RECOMMEND_POOL_KEY, member, BASE_INITIAL_SCORE + delta);
+                // 首次入池或沉寂唤醒：回查历史真实分值
+                double baseScore = BASE_INITIAL_SCORE;
+                Article article = articleMapper.selectById(articleId);
+                if (article == null || article.getStatus() != ArticleStatus.PUBLISHED) {
+                    return;
+                }
+                if (article.getRankScore() != null && article.getRankScore() > BASE_INITIAL_SCORE) {
+                    baseScore = article.getRankScore();
+                }
+                redis.opsForZSet().add(RECOMMEND_POOL_KEY, member, baseScore + delta);
             } else {
                 Double newScore = redis.opsForZSet().incrementScore(RECOMMEND_POOL_KEY, member, delta);
                 if (newScore != null && newScore < MIN_SCORE_THRESHOLD) {
