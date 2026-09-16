@@ -10,7 +10,6 @@ import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.mapper.ArticleTagRelMapper;
 import com.codesight.article.mapper.TagMapper;
 import com.codesight.article.model.entity.Article;
-import com.codesight.article.model.entity.ArticleTagRel;
 import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.ArticleVisible;
 import com.codesight.article.model.enums.FeedSortType;
@@ -309,37 +308,6 @@ class ArticleFeedServiceTest {
         assertEquals(2, response.items().size());
         assertTrue(response.items().get(0).getIsLiked());
         assertFalse(response.items().get(1).getIsLiked());
-    }
-
-    @Test
-    @DisplayName("测试相关推荐：正确查询当前文章分类与标签并返回 Top-5 卡片")
-    void testListRelatedArticles() {
-        Long articleId = 1L;
-        Long authorId = 99L;
-        Long categoryId = 2L;
-
-        Article currentArticle = createArticle(articleId, authorId, categoryId, Instant.now(), 100L, 10L);
-        when(articleMapper.selectById(articleId)).thenReturn(currentArticle);
-
-        List<ArticleTagRel> rels = List.of(
-                ArticleTagRel.builder().articleId(articleId).tagId(10L).build(),
-                ArticleTagRel.builder().articleId(articleId).tagId(11L).build()
-        );
-        when(articleTagRelMapper.selectList(any())).thenReturn(rels);
-
-        List<Article> relatedArticles = List.of(
-                createArticle(2L, authorId, categoryId, Instant.now(), 50L, 5L),
-                createArticle(3L, authorId, categoryId, Instant.now(), 40L, 4L)
-        );
-        when(articleMapper.selectRelatedArticles(eq(articleId), eq(categoryId), eq(List.of(10L, 11L)), eq(5)))
-                .thenReturn(relatedArticles);
-
-        List<ArticleFeedItemResponse> result = articleFeedService.listRelatedArticles(articleId, null);
-
-        assertNotNull(result);
-        assertEquals(2, result.size());
-        assertEquals(2L, result.get(0).getId());
-        assertEquals(3L, result.get(1).getId());
     }
 
     @Test

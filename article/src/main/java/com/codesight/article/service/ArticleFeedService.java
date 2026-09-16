@@ -222,44 +222,6 @@ public class ArticleFeedService {
     }
 
     /**
-     * 获取文章详情页底部相关推荐（Top-5）
-     *
-     * @param articleId     当前文章 ID
-     * @param currentUserId 当前登录用户 ID（可为空）
-     * @return 相关文章列表
-     */
-    public List<ArticleFeedItemResponse> listRelatedArticles(Long articleId, Long currentUserId) {
-        if (articleId == null) {
-            return Collections.emptyList();
-        }
-
-        Article currentArticle = articleMapper.selectById(articleId);
-        if (currentArticle == null || currentArticle.getStatus() == ArticleStatus.DELETED) {
-            return Collections.emptyList();
-        }
-
-        List<ArticleTagRel> rels = articleTagRelMapper.selectList(
-                new LambdaQueryWrapper<ArticleTagRel>().eq(ArticleTagRel::getArticleId, articleId)
-        );
-        List<Long> tagIds = (rels != null && !rels.isEmpty())
-                ? rels.stream().map(ArticleTagRel::getTagId).toList()
-                : Collections.emptyList();
-
-        List<Article> relatedArticles = articleMapper.selectRelatedArticles(
-                articleId,
-                currentArticle.getCategoryId(),
-                tagIds,
-                5
-        );
-
-        if (relatedArticles == null || relatedArticles.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return hydrateFeedItems(relatedArticles, currentUserId);
-    }
-
-    /**
      * 获取社交关注流（推拉结合）
      *
      * @param request       分页请求参数

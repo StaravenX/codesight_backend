@@ -122,29 +122,6 @@ class ArticleControllerTest {
     }
 
     @Test
-    @DisplayName("测试相关推荐接口 - 获取 Top-5 相关文章")
-    void testGetRelated() {
-        ArticleFeedItemResponse item = ArticleFeedItemResponse.builder()
-                .id(1002L)
-                .title("相关推荐文章")
-                .summary("摘要")
-                .authorId(2002L)
-                .tags(List.of())
-                .viewCount(10L)
-                .likeCount(2L)
-                .build();
-
-        when(articleFeedService.listRelatedArticles(1001L, 2001L)).thenReturn(List.of(item));
-
-        List<ArticleFeedItemResponse> list = articleController.getRelated(1001L, 2001L);
-
-        assertNotNull(list);
-        assertEquals(1, list.size());
-        assertEquals(1002L, list.getFirst().getId());
-        verify(articleFeedService).listRelatedArticles(1001L, 2001L);
-    }
-
-    @Test
     @DisplayName("测试通用信息流接口按 FOLLOWING 分发")
     void testGetFeed_FollowingDispatch() {
         ArticleFeedRequest request = ArticleFeedRequest.builder()

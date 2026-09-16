@@ -1,5 +1,6 @@
 package com.codesight.search.api;
 
+import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
 import com.codesight.search.api.dto.request.SearchRequest;
 import com.codesight.search.api.dto.response.SearchResponse;
 import com.codesight.search.service.SearchService;
@@ -10,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -60,4 +62,34 @@ class SearchControllerTest {
         assertEquals(20, request.size());
         assertEquals("cursor123", request.after());
     }
+
+    @Test
+    void shouldReturnRelatedArticlesForGuestUser() {
+        Long articleId = 1001L;
+        List<ArticleFeedItemResponse> mockList = List.of(
+                ArticleFeedItemResponse.builder().id(1002L).title("相似文章").build()
+        );
+        when(searchService.listRelatedArticles(eq(articleId), isNull())).thenReturn(mockList);
+
+        List<ArticleFeedItemResponse> response = searchController.getRelated(articleId, null);
+
+        assertNotNull(response);
+        assertEquals(1, response.size());
+        assertEquals(1002L, response.getFirst().getId());
+        verify(searchService, times(1)).listRelatedArticles(eq(articleId), isNull());
+    }
+
+    @Test
+    void shouldPassCurrentUserIdWhenGettingRelatedArticles() {
+        Long articleId = 1001L;
+        Long userId = 888L;
+        when(searchService.listRelatedArticles(eq(articleId), eq(userId))).thenReturn(Collections.emptyList());
+
+        List<ArticleFeedItemResponse> response = searchController.getRelated(articleId, userId);
+
+        assertNotNull(response);
+        assertEquals(0, response.size());
+        verify(searchService, times(1)).listRelatedArticles(eq(articleId), eq(userId));
+    }
 }
+
