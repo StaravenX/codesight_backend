@@ -5,7 +5,6 @@ import com.codesight.article.api.dto.request.ArticleFeedRequest;
 import com.codesight.article.api.dto.request.ArticlePatchRequest;
 import com.codesight.article.api.dto.response.ArticleCreateResponse;
 import com.codesight.article.api.dto.response.ArticleDetailResponse;
-import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
 import com.codesight.article.api.dto.response.ArticleFeedPageResponse;
 import com.codesight.article.api.dto.response.ArticlePatchResponse;
 import com.codesight.article.service.ArticleFeedService;
@@ -20,8 +19,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * 文章管理控制器
@@ -100,22 +97,6 @@ public class ArticleController {
             @Valid @ModelAttribute ArticleFeedRequest request,
             @CurrentUserId(required = false) Long userId) {
         return articleFeedService.getFeed(request, userId);
-    }
-
-    /**
-     * 获取文章详情页底部相关推荐
-     *
-     * @param id     当前文章 ID
-     * @param userId 当前登录用户 ID（可选）
-     * @return 相关文章推荐列表（Top-5）
-     */
-    @GetMapping("/{id}/related")
-    @Operation(summary = "获取文章相关推荐", description = "智能匹配同标签与同分类技术文章，并实时装配计数与互动状态")
-    @RateLimit(maxRequests = 300)
-    public List<ArticleFeedItemResponse> getRelated(
-            @PathVariable("id") Long id,
-            @CurrentUserId(required = false) Long userId) {
-        return articleFeedService.listRelatedArticles(id, userId);
     }
 }
 

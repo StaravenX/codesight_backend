@@ -56,27 +56,4 @@
         LIMIT #{limitSize}
     </select>
 
-    <!-- 详情页底部相关推荐 -->
-    <select id="selectRelatedArticles" resultType="com.codesight.article.model.entity.Article">
-        SELECT a.* FROM articles a
-        <if test="tagIds != null and !tagIds.isEmpty()">
-            INNER JOIN article_tag_rel atr ON a.id = atr.article_id AND atr.tag_id IN
-            <foreach item="item" collection="tagIds" open="(" separator="," close=")">
-                #{item}
-            </foreach>
-        </if>
-        WHERE a.id != #{excludeArticleId}
-        AND a.status = 'published' AND a.visible = 'public'
-        <if test="categoryId != null">
-            AND a.category_id = #{categoryId}
-        </if>
-        GROUP BY a.id
-        ORDER BY
-        <if test="tagIds != null and !tagIds.isEmpty()">
-            COUNT(atr.tag_id) DESC,
-        </if>
-        a.publish_time DESC, a.id DESC
-        LIMIT #{limitSize}
-    </select>
-
 </mapper>

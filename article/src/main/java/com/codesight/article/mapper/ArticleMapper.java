@@ -38,16 +38,6 @@ public interface ArticleMapper extends BaseMapper<Article> {
             @Param("cursorId") Long cursorId,
             @Param("limitSize") int limitSize
     );
-
-    /**
-     * 详情页底部相关推荐
-     */
-    List<Article> selectRelatedArticles(
-            @Param("excludeArticleId") Long excludeArticleId,
-            @Param("categoryId") Long categoryId,
-            @Param("tagIds") List<Long> tagIds,
-            @Param("limitSize") int limitSize
-    );
 }
 
 

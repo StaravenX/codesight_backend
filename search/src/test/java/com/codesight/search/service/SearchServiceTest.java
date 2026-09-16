@@ -7,6 +7,7 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
 import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
 import com.codesight.counter.schema.CounterSchema;
+import com.codesight.ai.service.ArticleVectorService;
 import com.codesight.counter.service.CounterService;
 import com.codesight.search.api.dto.request.SearchRequest;
 import com.codesight.search.config.SearchProperties;
@@ -43,6 +44,9 @@ class SearchServiceTest {
 
     @Mock
     private org.springframework.ai.embedding.EmbeddingModel embeddingModel;
+
+    @Mock
+    private ArticleVectorService articleVectorService;
 
     @InjectMocks
     private SearchService searchService;
@@ -296,5 +300,95 @@ class SearchServiceTest {
         searchService.search(request, 888L);
 
         verify(embeddingModel, never()).embed(anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldReturnRelatedArticlesSuccessfully() throws IOException {
+        Long articleId = 1001L;
+        Long currentUserId = 123L;
+
+        float[] mockVector = new float[1536];
+        mockVector[0] = 0.5f;
+        when(articleVectorService.batchGetArticleVector(List.of(articleId)))
+                .thenReturn(Map.of(articleId, mockVector));
+
+        ArticleSearchDoc doc = ArticleSearchDoc.builder()
+                .articleId(1002L)
+                .title("微服务设计原则")
+                .summary("核心架构总结")
+                .authorId(888L)
+                .authorNickname("架构师")
+                .publishTime(1700000000000L)
+                .likeCount(5L)
+                .favoriteCount(2L)
+                .viewCount(100L)
+                .status("published")
+                .build();
+
+        Hit<ArticleSearchDoc> mockHit = mock(Hit.class);
+        when(mockHit.source()).thenReturn(doc);
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of(mockHit));
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        when(counterService.batchGetCounts(eq(CounterSchema.EntityType.ARTICLE), eq(List.of("1002"))))
+                .thenReturn(Map.of("1002", Map.of(
+                        CounterSchema.ArticleMetric.LIKE, 15L,
+                        CounterSchema.ArticleMetric.VIEWS, 200L,
+                        CounterSchema.ArticleMetric.FAVORITE, 6L,
+                        CounterSchema.ArticleMetric.COMMENT, 3L
+                )));
+
+        when(counterService.batchIsSet(
+                eq(CounterSchema.EntityType.ARTICLE),
+                eq(List.of("1002")),
+                eq(CounterSchema.ArticleMetric.LIKE),
+                eq(currentUserId)
+        )).thenReturn(Map.of("1002", true));
+
+        List<ArticleFeedItemResponse> result = searchService.listRelatedArticles(articleId, currentUserId);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        ArticleFeedItemResponse item = result.getFirst();
+        assertEquals(1002L, item.getId());
+        assertEquals("微服务设计原则", item.getTitle());
+        assertEquals(15L, item.getLikeCount());
+        assertEquals(200L, item.getViewCount());
+        assertTrue(item.getIsLiked());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldFallbackGracefullyWhenArticleVectorNotFound() throws IOException {
+        Long articleId = 1001L;
+        when(articleVectorService.batchGetArticleVector(List.of(articleId))).thenReturn(Map.of());
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of());
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        List<ArticleFeedItemResponse> result = searchService.listRelatedArticles(articleId, null);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verify(es, times(1)).search(any(Function.class), eq(ArticleSearchDoc.class));
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenArticleIdIsNull() {
+        List<ArticleFeedItemResponse> result = searchService.listRelatedArticles(null, null);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(es);
     }
 }
