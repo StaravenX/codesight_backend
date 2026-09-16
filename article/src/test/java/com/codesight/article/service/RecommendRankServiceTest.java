@@ -157,7 +157,8 @@ class RecommendRankServiceTest {
                 any(RedisScript.class),
                 eq(List.of(RecommendRankService.RECOMMEND_POOL_KEY)),
                 eq("0.9"),
-                eq("3000")
+                eq("3000"),
+                eq("200")
         );
     }
 
