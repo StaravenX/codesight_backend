@@ -91,8 +91,9 @@ public class ArticleFeedService {
         if (isDefaultRecommended) {
             FeedCursor cursor = parseCursor(request.cursor(), CURSOR_PREFIX_RECOMMENDED);
             Double cursorRankScore = cursor != null ? (double) cursor.value() : null;
+            Long cursorArticleId = cursor != null ? cursor.articleId() : null;
 
-            List<TypedTuple<String>> tuples = recommendRankService.getRankedArticleIds(cursorRankScore, limitSize);
+            List<TypedTuple<String>> tuples = recommendRankService.getRankedArticleIds(cursorRankScore, cursorArticleId, limitSize);
             if (!tuples.isEmpty()) {
                 Map<Long, Double> scoreMap = new HashMap<>(tuples.size());
                 List<Long> articleIds = new ArrayList<>(tuples.size());

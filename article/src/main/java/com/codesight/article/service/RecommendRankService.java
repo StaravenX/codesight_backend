@@ -66,25 +66,41 @@ public class RecommendRankService {
      * 从推荐候选池中分页拉取文章 ID 与对应排序分
      *
      * @param cursorRankScore 游标排序分（首屏为 null）
+     * @param cursorArticleId 游标文章 ID（首屏为 null）
      * @param limitSize       拉取数量（通常为 size + 1）
      * @return 文章 ID 及其对应排序分列表（按分数倒序排列）
      */
-    public List<TypedTuple<String>> getRankedArticleIds(Double cursorRankScore, int limitSize) {
+    public List<TypedTuple<String>> getRankedArticleIds(Double cursorRankScore, Long cursorArticleId, int limitSize) {
+        if (limitSize <= 0) {
+            return Collections.emptyList();
+        }
         try {
-            double max = (cursorRankScore != null) ? (cursorRankScore - 0.00001) : Double.POSITIVE_INFINITY;
-            double min = 0.0;
 
-            Set<TypedTuple<String>> tuples = redis.opsForZSet()
-                    .reverseRangeByScoreWithScores(RECOMMEND_POOL_KEY, min, max, 0, limitSize);
-
-            if (tuples == null || tuples.isEmpty()) {
-                return Collections.emptyList();
+            if (cursorArticleId == null) {
+                Set<TypedTuple<String>> tuples = redis.opsForZSet()
+                        .reverseRangeWithScores(RECOMMEND_POOL_KEY, 0, limitSize - 1);
+                return (tuples == null || tuples.isEmpty()) ? Collections.emptyList() : new ArrayList<>(tuples);
             }
-            return new ArrayList<>(tuples);
+
+            // 基于文章 ID 获取其在 ZSet 中的绝对排位
+            String member = String.valueOf(cursorArticleId);
+            Long rank = redis.opsForZSet().reverseRank(RECOMMEND_POOL_KEY, member);
+            if (rank != null) {
+                Set<TypedTuple<String>> tuples = redis.opsForZSet()
+                        .reverseRangeWithScores(RECOMMEND_POOL_KEY, rank + 1, rank + limitSize);
+                return (tuples == null || tuples.isEmpty()) ? Collections.emptyList() : new ArrayList<>(tuples);
+            }
+
+            // ZSet中未找到相应文章ID
+            double max = (cursorRankScore != null) ? cursorRankScore : Double.POSITIVE_INFINITY;
+            Set<TypedTuple<String>> fallbackTuples = redis.opsForZSet()
+                    .reverseRangeByScoreWithScores(RECOMMEND_POOL_KEY, 0.0, max, 0, limitSize);
+            return (fallbackTuples == null || fallbackTuples.isEmpty()) ? Collections.emptyList() : new ArrayList<>(fallbackTuples);
         } catch (Exception e) {
             return Collections.emptyList();
         }
     }
+
 
     /**
      * 文章批量降温

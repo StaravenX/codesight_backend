@@ -217,7 +217,7 @@ class ArticleFeedServiceTest {
             mockList.add(createArticle(i, 200L, 2L, now.minusSeconds(i * 60), 500L - i * 10, 50L - i));
         }
 
-        when(recommendRankService.getRankedArticleIds(isNull(), eq(21)))
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(21)))
                 .thenReturn(Collections.emptyList());
         when(articleMapper.selectFeedRecommended(isNull(), isNull(), isNull(), any(Instant.class), isNull(), isNull(), eq(21)))
                 .thenReturn(mockList);
@@ -252,7 +252,7 @@ class ArticleFeedServiceTest {
             mockArticles.add(createArticle(i, 200L, 2L, now.minusSeconds(i * 60), 500L - i * 10, 50L - i));
         }
 
-        when(recommendRankService.getRankedArticleIds(isNull(), eq(21)))
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(21)))
                 .thenReturn(mockTuples);
         when(articleMapper.selectByIds(eq(mockIds)))
                 .thenReturn(mockArticles);
@@ -559,7 +559,7 @@ class ArticleFeedServiceTest {
                 new DefaultTypedTuple<>("101", 1000.0),
                 new DefaultTypedTuple<>("102", 900.0)
         );
-        when(recommendRankService.getRankedArticleIds(null, 11)).thenReturn(tuples);
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(11))).thenReturn(tuples);
         when(articleMapper.selectByIds(List.of(101L, 102L))).thenReturn(List.of(a1, a2));
  
         // 模拟 AI 模块精排：用户画像与 a2 契合度极高，重排为 [a2, a1]
@@ -589,7 +589,7 @@ class ArticleFeedServiceTest {
                 new DefaultTypedTuple<>("201", 1000.0),
                 new DefaultTypedTuple<>("202", 950.0)
         );
-        when(recommendRankService.getRankedArticleIds(null, 11)).thenReturn(tuples);
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(11))).thenReturn(tuples);
         when(articleMapper.selectByIds(List.of(201L, 202L))).thenReturn(List.of(cleanArticle, softArticle));
 
         // 模拟 AI 模块负向语义剪枝：剔除 202 同质营销软文，仅保留 201
@@ -607,4 +607,26 @@ class ArticleFeedServiceTest {
         assertEquals(1, response.items().size());
         assertEquals(201L, response.items().getFirst().getId());
     }
+
+    @Test
+    @DisplayName("推荐流翻页：正确解析游标中的 score 与 articleId 并传递给排位服务")
+    void testRecommendedFeed_CursorPassesArticleIdToRankService() {
+        // 构建游标：rec:80:1002 (prefix=rec, score=80, articleId=1002)
+        String raw = "rec:80:1002";
+        String fullCursor = Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+
+        when(recommendRankService.getRankedArticleIds(eq(80.0), eq(1002L), eq(11)))
+                .thenReturn(Collections.emptyList());
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .sortBy(FeedSortType.RECOMMENDED)
+                .cursor(fullCursor)
+                .size(10)
+                .build();
+
+        articleFeedService.getFeed(request, null);
+
+        verify(recommendRankService, times(1)).getRankedArticleIds(eq(80.0), eq(1002L), eq(11));
+    }
 }
+

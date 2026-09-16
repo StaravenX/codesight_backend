@@ -57,25 +57,69 @@ class RecommendRankServiceTest {
     }
 
     @Test
-    @DisplayName("测试游标拉取推荐流：根据游标分范围查询")
-    void testGetRankedArticleIds() {
+    @DisplayName("测试首屏拉取推荐池：直接按绝对排位切片")
+    void testGetRankedArticleIds_FirstPage() {
         Set<TypedTuple<String>> mockTuples = new LinkedHashSet<>();
         mockTuples.add(new DefaultTypedTuple<>("1001", 90.0));
         mockTuples.add(new DefaultTypedTuple<>("1002", 80.0));
 
-        when(zSetOperations.reverseRangeByScoreWithScores(
+        when(zSetOperations.reverseRangeWithScores(
                 eq(RecommendRankService.RECOMMEND_POOL_KEY),
-                eq(0.0),
-                anyDouble(),
                 eq(0L),
-                eq(10L)
+                eq(9L)
         )).thenReturn(mockTuples);
 
-        List<TypedTuple<String>> result = service.getRankedArticleIds(100.0, 10);
+        List<TypedTuple<String>> result = service.getRankedArticleIds(null, null, 10);
 
         assertEquals(2, result.size());
         assertEquals("1001", result.getFirst().getValue());
     }
+
+    @Test
+    @DisplayName("测试翻页拉取推荐池：基于文章绝对排位向后切片")
+    void testGetRankedArticleIds_NextPage_ByRank() {
+        Long lastArticleId = 1002L;
+        Set<TypedTuple<String>> mockTuples = new LinkedHashSet<>();
+        mockTuples.add(new DefaultTypedTuple<>("1003", 80.0)); // 与 1002 同分，天然保留
+        mockTuples.add(new DefaultTypedTuple<>("1004", 75.0));
+
+        when(zSetOperations.reverseRank(RecommendRankService.RECOMMEND_POOL_KEY, "1002")).thenReturn(9L);
+        when(zSetOperations.reverseRangeWithScores(
+                eq(RecommendRankService.RECOMMEND_POOL_KEY),
+                eq(10L),
+                eq(19L)
+        )).thenReturn(mockTuples);
+
+        List<TypedTuple<String>> result = service.getRankedArticleIds(80.0, lastArticleId, 10);
+
+        assertEquals(2, result.size());
+        assertEquals("1003", result.getFirst().getValue());
+        assertEquals(80.0, result.getFirst().getScore());
+    }
+
+    @Test
+    @DisplayName("测试翻页拉取推荐池：文章已出池时降级按分数截断")
+    void testGetRankedArticleIds_NextPage_FallbackWhenOutOfPool() {
+        Long lastArticleId = 1002L;
+        Set<TypedTuple<String>> mockTuples = new LinkedHashSet<>();
+        mockTuples.add(new DefaultTypedTuple<>("1003", 75.0));
+
+        when(zSetOperations.reverseRank(RecommendRankService.RECOMMEND_POOL_KEY, "1002")).thenReturn(null);
+        when(zSetOperations.reverseRangeByScoreWithScores(
+                eq(RecommendRankService.RECOMMEND_POOL_KEY),
+                eq(0.0),
+                eq(80.0),
+                eq(0L),
+                eq(10L)
+        )).thenReturn(mockTuples);
+
+        List<TypedTuple<String>> result = service.getRankedArticleIds(80.0, lastArticleId, 10);
+
+        assertEquals(1, result.size());
+        assertEquals("1003", result.getFirst().getValue());
+    }
+
+
 
     @Test
     @DisplayName("测试半衰期降温调用 Lua 脚本")
