@@ -25,6 +25,7 @@ public class RecommendRankService {
 
     public static final String RECOMMEND_POOL_KEY = "feed:recommend:pool";
     public static final int DEFAULT_MAX_CAPACITY = 3000;
+    public static final int DEFAULT_MIN_CAPACITY = 200;
     public static final double DEFAULT_DECAY_FACTOR = 0.9;
     public static final double BASE_INITIAL_SCORE = 10.0;
     public static final double MIN_SCORE_THRESHOLD = 1.0;
@@ -122,7 +123,8 @@ public class RecommendRankService {
                 decayScript,
                 List.of(RECOMMEND_POOL_KEY),
                 String.valueOf(factor),
-                String.valueOf(maxCapacity)
+                String.valueOf(maxCapacity),
+                String.valueOf(DEFAULT_MIN_CAPACITY)
         );
     }
 
