@@ -1,5 +1,8 @@
 package com.codesight.article.service;
 
+import com.codesight.article.mapper.ArticleMapper;
+import com.codesight.article.model.entity.Article;
+import com.codesight.article.model.enums.ArticleStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,22 +31,60 @@ class RecommendRankServiceTest {
     @Mock
     private ZSetOperations<String, String> zSetOperations;
 
+    @Mock
+    private ArticleMapper articleMapper;
+
     private RecommendRankService service;
 
     @BeforeEach
     void setUp() {
         lenient().when(redis.opsForZSet()).thenReturn(zSetOperations);
-        service = new RecommendRankService(redis);
+        service = new RecommendRankService(redis, articleMapper);
     }
 
     @Test
-    @DisplayName("测试首次入池：赋予基础起跑分 + 增量分")
+    @DisplayName("测试首次入池：新文章（rankScore=0）赋予基础起跑分 + 增量分")
     void testAddOrIncrScoreNewItem() {
         when(zSetOperations.score(RecommendRankService.RECOMMEND_POOL_KEY, "1001")).thenReturn(null);
+        when(articleMapper.selectById(1001L)).thenReturn(Article.builder()
+                .id(1001L)
+                .status(ArticleStatus.PUBLISHED)
+                .rankScore(0.0)
+                .build());
 
         service.addOrIncrScore(1001L, 5.0);
 
         verify(zSetOperations).add(RecommendRankService.RECOMMEND_POOL_KEY, "1001", 15.0);
+    }
+
+    @Test
+    @DisplayName("测试沉寂爆款唤醒：继承历史真实高分并累加增量分")
+    void testAddOrIncrScore_AwakenHistoricalHotArticle() {
+        when(zSetOperations.score(RecommendRankService.RECOMMEND_POOL_KEY, "1001")).thenReturn(null);
+        when(articleMapper.selectById(1001L)).thenReturn(Article.builder()
+                .id(1001L)
+                .status(ArticleStatus.PUBLISHED)
+                .rankScore(120.0)
+                .build());
+
+        service.addOrIncrScore(1001L, 5.0);
+
+        // 120.0 + 5.0 = 125.0
+        verify(zSetOperations).add(RecommendRankService.RECOMMEND_POOL_KEY, "1001", 125.0);
+    }
+
+    @Test
+    @DisplayName("测试拦截非公开文章：草稿或已删除文章严禁被唤醒入池")
+    void testAddOrIncrScore_InterceptDraftArticle() {
+        when(zSetOperations.score(RecommendRankService.RECOMMEND_POOL_KEY, "1001")).thenReturn(null);
+        when(articleMapper.selectById(1001L)).thenReturn(Article.builder()
+                .id(1001L)
+                .status(ArticleStatus.DRAFT)
+                .build());
+
+        service.addOrIncrScore(1001L, 5.0);
+
+        verify(zSetOperations, never()).add(anyString(), anyString(), anyDouble());
     }
 
     @Test
