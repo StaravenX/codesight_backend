@@ -26,5 +26,10 @@ public class RecommendRankDecayTask {
                 RecommendRankService.DEFAULT_DECAY_FACTOR,
                 RecommendRankService.DEFAULT_MAX_CAPACITY
         );
+
+        recommendRankService.refillPoolIfLow(
+                RecommendRankService.REFILL_ALERT_THRESHOLD,
+                RecommendRankService.DEFAULT_MAX_CAPACITY
+        );
     }
 }
