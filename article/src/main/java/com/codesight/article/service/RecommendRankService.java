@@ -1,8 +1,10 @@
 package com.codesight.article.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.model.entity.Article;
 import com.codesight.article.model.enums.ArticleStatus;
+import com.codesight.article.model.enums.ArticleVisible;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -32,6 +34,8 @@ public class RecommendRankService {
     public static final double DEFAULT_DECAY_FACTOR = 0.9;
     public static final double BASE_INITIAL_SCORE = 10.0;
     public static final double MIN_SCORE_THRESHOLD = 1.0;
+    public static final int WARMUP_MIN_THRESHOLD = 100;
+    public static final int REFILL_ALERT_THRESHOLD = 500;
 
     private final StringRedisTemplate redis;
     private final ArticleMapper articleMapper;
@@ -193,6 +197,35 @@ public class RecommendRankService {
             }
         } catch (Exception e) {
             log.warn("批量回填推荐候选池失败", e);
+        }
+    }
+
+    /**
+     * 若推荐候选池容量不足，从数据库获取优质历史文章
+     *
+     * @param threshold 触发回灌的容量下限警戒线
+     * @param limitSize 目标注满容量（如 3000）
+     * @return 是否触发了回灌
+     */
+    public boolean refillPoolIfLow(long threshold, int limitSize) {
+        try {
+            Long currentSize = redis.opsForZSet().zCard(RECOMMEND_POOL_KEY);
+            if (currentSize != null && currentSize >= threshold) {
+                return false;
+            }
+            List<Article> topArticles = articleMapper.selectList(
+                    new LambdaQueryWrapper<Article>()
+                            .eq(Article::getStatus, ArticleStatus.PUBLISHED)
+                            .eq(Article::getVisible, ArticleVisible.PUBLIC)
+                            .orderByDesc(Article::getRankScore)
+                            .orderByDesc(Article::getId)
+                            .last("LIMIT " + limitSize)
+            );
+            batchAddScores(topArticles);
+            return true;
+        } catch (Exception e) {
+            log.error("推荐候选池自愈回灌异常", e);
+            return false;
         }
     }
 

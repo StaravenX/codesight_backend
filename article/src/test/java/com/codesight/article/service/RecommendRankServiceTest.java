@@ -3,6 +3,7 @@ package com.codesight.article.service;
 import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.model.entity.Article;
 import com.codesight.article.model.enums.ArticleStatus;
+import com.codesight.article.model.enums.ArticleVisible;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -230,5 +231,31 @@ class RecommendRankServiceTest {
         service.removeArticle(3001L);
 
         verify(zSetOperations).remove(RecommendRankService.RECOMMEND_POOL_KEY, "3001");
+    }
+
+    @Test
+    @DisplayName("测试容量自愈回灌：容量充盈时不触发回灌")
+    void testRefillPoolIfLow_WhenSufficient_ShouldSkip() {
+        when(zSetOperations.zCard(RecommendRankService.RECOMMEND_POOL_KEY)).thenReturn(600L);
+
+        boolean refilled = service.refillPoolIfLow(500, 3000);
+
+        assertFalse(refilled);
+        verify(articleMapper, never()).selectList(any());
+        verify(zSetOperations, never()).add(anyString(), anySet());
+    }
+
+    @Test
+    @DisplayName("测试容量自愈回灌：容量不足警戒线时自动从数据库捞取文章批量注满")
+    void testRefillPoolIfLow_WhenLow_ShouldRefill() {
+        when(zSetOperations.zCard(RecommendRankService.RECOMMEND_POOL_KEY)).thenReturn(80L);
+        Article a = Article.builder().id(5001L).rankScore(90.0).status(ArticleStatus.PUBLISHED).visible(ArticleVisible.PUBLIC).build();
+        when(articleMapper.selectList(any())).thenReturn(List.of(a));
+
+        boolean refilled = service.refillPoolIfLow(100, 3000);
+
+        assertTrue(refilled);
+        verify(articleMapper).selectList(any());
+        verify(zSetOperations).add(eq(RecommendRankService.RECOMMEND_POOL_KEY), anySet());
     }
 }
