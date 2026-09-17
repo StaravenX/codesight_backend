@@ -58,6 +58,7 @@ class ArticleFeedServiceTest {
         MybatisConfiguration configuration = new MybatisConfiguration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, "");
         TableInfoHelper.initTableInfo(assistant, UserFollower.class);
+        TableInfoHelper.initTableInfo(assistant, Article.class);
     }
 
     @Mock
@@ -627,6 +628,103 @@ class ArticleFeedServiceTest {
         articleFeedService.getFeed(request, null);
 
         verify(recommendRankService, times(1)).getRankedArticleIds(eq(80.0), eq(1002L), eq(11));
+    }
+
+    @Test
+    @DisplayName("新关注普通博主：成功从发件箱回填历史文章至粉丝收件箱")
+    void testBackfillOnFollow_NormalBlogger_ShouldBackfillInbox() {
+        Long authorId = 8888L;
+        Long followerId = 2001L;
+
+        when(counterService.getCounts(eq(CounterSchema.EntityType.USER), eq(String.valueOf(authorId))))
+                .thenReturn(Map.of(CounterSchema.UserMetric.FOLLOWERS, 100L));
+
+        Set<TypedTuple<String>> outboxTuples = new LinkedHashSet<>();
+        outboxTuples.add(new DefaultTypedTuple<>("101", 1000.0));
+        outboxTuples.add(new DefaultTypedTuple<>("102", 2000.0));
+
+        when(zSetOperations.reverseRangeWithScores(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(0L), eq(19L)))
+                .thenReturn(outboxTuples);
+
+        articleFeedService.backfillOnFollow(followerId, authorId);
+
+        verify(stringRedisTemplate).executePipelined(any(SessionCallback.class));
+    }
+
+    @Test
+    @DisplayName("新关注大 V 博主：跳过收件箱回填（大 V 走读扩散拉模式）")
+    void testBackfillOnFollow_BigV_ShouldSkip() {
+        Long authorId = 9999L;
+        Long followerId = 2001L;
+
+        when(counterService.getCounts(eq(CounterSchema.EntityType.USER), eq(String.valueOf(authorId))))
+                .thenReturn(Map.of(CounterSchema.UserMetric.FOLLOWERS, 6000L));
+
+        articleFeedService.backfillOnFollow(followerId, authorId);
+
+        verify(stringRedisTemplate, never()).executePipelined(any(SessionCallback.class));
+        verify(zSetOperations, never()).reverseRangeWithScores(anyString(), anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("新关注普通博主发件箱为空时，兜底从 MySQL 捞取公开文章回填")
+    void testBackfillOnFollow_EmptyOutbox_ShouldFallbackDB() {
+        Long authorId = 8888L;
+        Long followerId = 2001L;
+
+        when(counterService.getCounts(eq(CounterSchema.EntityType.USER), eq(String.valueOf(authorId))))
+                .thenReturn(Map.of(CounterSchema.UserMetric.FOLLOWERS, 100L));
+        when(zSetOperations.reverseRangeWithScores(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(0L), eq(19L)))
+                .thenReturn(Collections.emptySet());
+
+        Article a1 = Article.builder().id(101L).authorId(authorId).publishTime(Instant.now()).status(ArticleStatus.PUBLISHED).visible(ArticleVisible.PUBLIC).build();
+        when(articleMapper.selectList(any())).thenReturn(List.of(a1));
+
+        articleFeedService.backfillOnFollow(followerId, authorId);
+
+        verify(articleMapper).selectList(any());
+        verify(stringRedisTemplate).executePipelined(any(SessionCallback.class));
+    }
+
+    @Test
+    @DisplayName("取关普通博主：从粉丝收件箱批量移除该博主所有文章")
+    void testCleanupOnUnfollow_ShouldRemoveFromInbox() {
+        Long authorId = 8888L;
+        Long followerId = 2001L;
+
+        when(zSetOperations.range(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(0L), eq(-1L)))
+                .thenReturn(Set.of("101", "102"));
+
+        articleFeedService.cleanupOnUnfollow(followerId, authorId);
+
+        verify(zSetOperations).remove(eq(FeedRedisKeys.getInboxKey(followerId)), any(Object[].class));
+    }
+
+    @Test
+    @DisplayName("取关普通博主发件箱为空时，兜底从数据库获取文章 ID 并清理")
+    void testCleanupOnUnfollow_EmptyOutbox_ShouldFallbackDB() {
+        Long authorId = 8888L;
+        Long followerId = 2001L;
+
+        when(zSetOperations.range(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(0L), eq(-1L)))
+                .thenReturn(Collections.emptySet());
+
+        Article a1 = Article.builder().id(101L).build();
+        when(articleMapper.selectList(any())).thenReturn(List.of(a1));
+
+        articleFeedService.cleanupOnUnfollow(followerId, authorId);
+
+        verify(articleMapper).selectList(any());
+        verify(zSetOperations).remove(eq(FeedRedisKeys.getInboxKey(followerId)), any(Object[].class));
+    }
+
+    @Test
+    @DisplayName("关注回填与取关清理空入参安全防御")
+    void testFollowBackfillAndCleanup_NullGuards() {
+        assertDoesNotThrow(() -> articleFeedService.backfillOnFollow(null, null));
+        assertDoesNotThrow(() -> articleFeedService.backfillOnFollow(1L, null));
+        assertDoesNotThrow(() -> articleFeedService.cleanupOnUnfollow(null, null));
+        assertDoesNotThrow(() -> articleFeedService.cleanupOnUnfollow(1L, null));
     }
 }
 

@@ -16,10 +16,12 @@ import com.codesight.relation.mapper.UserFollowingMapper;
 import com.codesight.relation.model.UserFollower;
 import com.codesight.relation.model.UserFollowing;
 import com.codesight.relation.util.RelationCursor;
+import com.codesight.relation.event.FollowEvent;
 import com.codesight.user.UserBaseInfo;
 import com.codesight.user.UserCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,7 @@ public class RelationService {
     private final RelationCacheService relationCacheService;
     private final CounterService counterService;
     private final CounterEventProducer counterEventProducer;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 发起关注
@@ -92,6 +95,9 @@ public class RelationService {
         // 异步更新双向计数（被关注者+1粉丝，发起者+1关注）
         publishCounterEvents(fromUserId, toUserId, 1);
 
+        // 发布关注领域事件
+        eventPublisher.publishEvent(new FollowEvent(fromUserId, toUserId, FollowEvent.FollowAction.FOLLOW));
+
         return true;
     }
 
@@ -130,6 +136,9 @@ public class RelationService {
 
             // 异步更新双向计数（被关注者-1粉丝，发起者-1关注）
             publishCounterEvents(fromUserId, toUserId, -1);
+
+            // 发布取关领域事件
+            eventPublisher.publishEvent(new FollowEvent(fromUserId, toUserId, FollowEvent.FollowAction.UNFOLLOW));
         }
 
         return true;

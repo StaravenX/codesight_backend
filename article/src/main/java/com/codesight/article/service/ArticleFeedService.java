@@ -665,6 +665,105 @@ public class ArticleFeedService {
 
     }
 
+    /**
+     * 关注回填
+     *
+     * @param followerId 粉丝 ID
+     * @param authorId   被关注博主 ID
+     */
+    public void backfillOnFollow(Long followerId, Long authorId) {
+        Map<CounterSchema.MetricItem, Long> userCounts = counterService.getCounts(
+                CounterSchema.EntityType.USER,
+                String.valueOf(authorId)
+        );
+        long followerCount = userCounts != null
+                ? userCounts.getOrDefault(CounterSchema.UserMetric.FOLLOWERS, 0L)
+                : 0L;
+        if (isBigV(authorId, followerCount)) {
+            return;
+        }
+
+        // 取出最近 20 篇历史文章
+        String outboxKey = FeedRedisKeys.getOutboxKey(authorId);
+        Set<TypedTuple<String>> outboxTuples = stringRedisTemplate.opsForZSet()
+                .reverseRangeWithScores(outboxKey, 0, 19);
+
+        // 若 Redis 发件箱为空，从数据库加载
+        List<Article> fallbackArticles = Collections.emptyList();
+        if (outboxTuples == null || outboxTuples.isEmpty()) {
+            fallbackArticles = articleMapper.selectList(
+                    new LambdaQueryWrapper<Article>()
+                            .eq(Article::getAuthorId, authorId)
+                            .eq(Article::getStatus, ArticleStatus.PUBLISHED)
+                            .eq(Article::getVisible, ArticleVisible.PUBLIC)
+                            .orderByDesc(Article::getPublishTime)
+                            .last("LIMIT 20")
+            );
+            if (fallbackArticles == null || fallbackArticles.isEmpty()) {
+                return;
+            }
+        }
+
+        final Set<TypedTuple<String>> tuplesToBackfill = outboxTuples;
+        final List<Article> articlesToBackfill = fallbackArticles;
+
+        stringRedisTemplate.executePipelined(new SessionCallback<>() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public Object execute(@NonNull RedisOperations operations) throws DataAccessException {
+                String inboxKey = FeedRedisKeys.getInboxKey(followerId);
+                if (tuplesToBackfill != null && !tuplesToBackfill.isEmpty()) {
+                    for (TypedTuple<String> tuple : tuplesToBackfill) {
+                        if (tuple.getValue() != null && tuple.getScore() != null) {
+                            operations.opsForZSet().add(inboxKey, tuple.getValue(), tuple.getScore());
+                        }
+                    }
+                } else {
+                    for (Article a : articlesToBackfill) {
+                        if (a.getId() != null && a.getPublishTime() != null) {
+                            operations.opsForZSet().add(inboxKey, String.valueOf(a.getId()), a.getPublishTime().toEpochMilli());
+                        }
+                    }
+                }
+                operations.opsForZSet().removeRange(inboxKey, 0, -(FeedRedisKeys.INBOX_MAX_CAPACITY + 1));
+                return null;
+            }
+        });
+    }
+
+    /**
+     * 取关清理
+     *
+     * @param followerId 取消关注者 ID
+     * @param authorId   被取关博主 ID
+     */
+    public void cleanupOnUnfollow(Long followerId, Long authorId) {
+        // 1. 获取该博主的所有有效文章 ID（优先从发件箱获取，发件箱为空查库兜底）
+        String outboxKey = FeedRedisKeys.getOutboxKey(authorId);
+        Set<String> articleIds = stringRedisTemplate.opsForZSet().range(outboxKey, 0, -1);
+
+        if (articleIds == null || articleIds.isEmpty()) {
+            List<Article> articles = articleMapper.selectList(
+                    new LambdaQueryWrapper<Article>()
+                            .select(Article::getId)
+                            .eq(Article::getAuthorId, authorId)
+            );
+            if (articles != null && !articles.isEmpty()) {
+                articleIds = articles.stream()
+                        .map(a -> String.valueOf(a.getId()))
+                        .collect(Collectors.toSet());
+            }
+        }
+
+        if (articleIds == null || articleIds.isEmpty()) {
+            return;
+        }
+
+        // 2. 从粉丝收件箱中批量移除该博主的所有文章
+        String inboxKey = FeedRedisKeys.getInboxKey(followerId);
+        stringRedisTemplate.opsForZSet().remove(inboxKey, articleIds.toArray(new Object[0]));
+    }
+
     private record FeedCursor(long value, long articleId) {}
 
 }

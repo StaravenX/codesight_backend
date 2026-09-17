@@ -13,6 +13,7 @@ import com.codesight.relation.api.dto.request.FollowListQueryRequest;
 import com.codesight.relation.api.dto.response.FollowUserItemResponse;
 import com.codesight.relation.api.dto.response.RelationCursorPageResponse;
 import com.codesight.relation.api.dto.response.RelationStatusResponse;
+import com.codesight.relation.event.FollowEvent;
 import com.codesight.relation.mapper.UserFollowerMapper;
 import com.codesight.relation.mapper.UserFollowingMapper;
 import com.codesight.relation.model.UserFollower;
@@ -30,6 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -71,6 +73,9 @@ class RelationServiceTest {
     @Mock
     private CounterEventProducer counterEventProducer;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private RelationService relationService;
 
@@ -84,7 +89,7 @@ class RelationServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.CANNOT_FOLLOW_SELF.getMsg());
 
-        verifyNoInteractions(userFollowingMapper, userFollowerMapper, relationCacheService, counterEventProducer);
+        verifyNoInteractions(userFollowingMapper, userFollowerMapper, relationCacheService, counterEventProducer, eventPublisher);
     }
 
     @Test
@@ -97,11 +102,11 @@ class RelationServiceTest {
                 .hasMessage(ErrorCode.FOLLOW_LIMIT_EXCEEDED.getMsg());
 
         verify(userFollowingMapper, never()).insert(any(UserFollowing.class));
-        verifyNoInteractions(counterEventProducer);
+        verifyNoInteractions(counterEventProducer, eventPublisher);
     }
 
     @Test
-    @DisplayName("首次关注成功：物理双写落库、同步缓存并投递 2 条 Kafka 计数变更事件")
+    @DisplayName("首次关注成功：物理双写落库、同步缓存并投递 2 条 Kafka 计数变更事件与 1 条 FollowEvent")
     void testFollow_Success_FirstTime_ShouldInsertAndPublishEvents() {
         when(relationCacheService.isFollowing(USER_A, USER_B)).thenReturn(false);
         when(userFollowingMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(10L);
@@ -131,6 +136,9 @@ class RelationServiceTest {
         assertThat(authorFollowingEvent.entityId()).isEqualTo(String.valueOf(USER_A));
         assertThat(authorFollowingEvent.metric()).isEqualTo(CounterSchema.UserMetric.FOLLOWINGS.getCode());
         assertThat(authorFollowingEvent.delta()).isEqualTo(1);
+
+        // 验证发布关注领域事件
+        verify(eventPublisher).publishEvent(new FollowEvent(USER_A, USER_B, FollowEvent.FollowAction.FOLLOW));
     }
 
     @Test
@@ -144,11 +152,11 @@ class RelationServiceTest {
         verify(userFollowingMapper, never()).selectCount(any());
         verify(userFollowingMapper, never()).insert(any(UserFollowing.class));
         verify(relationCacheService, never()).addFollowing(any(), any());
-        verifyNoInteractions(counterEventProducer);
+        verifyNoInteractions(counterEventProducer, eventPublisher);
     }
 
     @Test
-    @DisplayName("取消关注成功：物理删除双表记录、移除缓存并投递 2 条扣减计数事件")
+    @DisplayName("取消关注成功：物理删除双表记录、移除缓存并投递 2 条扣减计数事件与 1 条 UnfollowEvent")
     void testUnfollow_Success_ShouldDeleteAndPublishEvents() {
         when(relationCacheService.isFollowing(USER_A, USER_B)).thenReturn(true);
         when(userFollowingMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(1);
@@ -172,6 +180,9 @@ class RelationServiceTest {
         assertThat(events.get(1).entityId()).isEqualTo(String.valueOf(USER_A));
         assertThat(events.get(1).metric()).isEqualTo(CounterSchema.UserMetric.FOLLOWINGS.getCode());
         assertThat(events.get(1).delta()).isEqualTo(-1);
+
+        // 验证发布取关领域事件
+        verify(eventPublisher).publishEvent(new FollowEvent(USER_A, USER_B, FollowEvent.FollowAction.UNFOLLOW));
     }
 
     @Test
@@ -184,7 +195,7 @@ class RelationServiceTest {
         assertThat(result).isTrue();
         verify(userFollowingMapper, never()).delete(any());
         verify(relationCacheService, never()).removeFollowing(any(), any());
-        verifyNoInteractions(counterEventProducer);
+        verifyNoInteractions(counterEventProducer, eventPublisher);
     }
 
     @Test
@@ -192,7 +203,7 @@ class RelationServiceTest {
     void testUnfollow_Self_ShouldReturnTrueDirectly() {
         boolean result = relationService.unfollow(USER_A, USER_A);
         assertThat(result).isTrue();
-        verifyNoInteractions(userFollowingMapper, userFollowerMapper, counterEventProducer);
+        verifyNoInteractions(userFollowingMapper, userFollowerMapper, counterEventProducer, eventPublisher);
     }
 
     @Test
