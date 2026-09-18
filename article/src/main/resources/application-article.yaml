@@ -1,0 +1,8 @@
+codesight:
+  feed:
+    big-v-promotion-threshold: 5500
+    big-v-demotion-threshold: 4500
+    inbox-max-capacity: 200
+    outbox-max-capacity: 100
+    exposed-max-capacity: 1000
+    exposed-ttl: 24h

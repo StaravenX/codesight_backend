@@ -20,29 +20,14 @@ public class FeedRedisKeys {
 
 
     /**
-     * 大 V 晋升门槛（粉丝数 >= 5500 晋升为大 V，走拉模式）
-     */
-    public static final long BIG_V_PROMOTION_THRESHOLD = 5500L;
-
-    /**
-     * 大 V 降级门槛（粉丝数 < 4500 跌落为普通博主，走推模式）
-     */
-    public static final long BIG_V_DEMOTION_THRESHOLD = 4500L;
-
-    /**
      * 大 V 状态机集合 Redis Key
      */
     public static final String BIG_V_SET_KEY = "feed:big_v:authors";
 
     /**
-     * 粉丝收件箱最大保留条数
+     * 用户推荐流已读曝光 Key 前缀
      */
-    public static final int INBOX_MAX_CAPACITY = 200;
-
-    /**
-     * 作者发件箱最大保留条数
-     */
-    public static final int OUTBOX_MAX_CAPACITY = 100;
+    public static final String EXPOSED_PREFIX = "feed:user:exposed:";
 
     /**
      * 获取粉丝个人收件箱 Redis Key
@@ -62,5 +47,15 @@ public class FeedRedisKeys {
      */
     public static String getOutboxKey(Long authorId) {
         return OUTBOX_PREFIX + authorId;
+    }
+
+    /**
+     * 获取用户推荐流已读曝光 Redis Key
+     *
+     * @param userId 用户 ID
+     * @return Redis Key
+     */
+    public static String getExposedKey(Long userId) {
+        return EXPOSED_PREFIX + userId;
     }
 }

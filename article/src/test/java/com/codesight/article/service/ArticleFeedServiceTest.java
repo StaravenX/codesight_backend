@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.codesight.article.api.dto.request.ArticleFeedRequest;
 import com.codesight.article.api.dto.response.ArticleFeedItemResponse;
 import com.codesight.article.api.dto.response.ArticleFeedPageResponse;
+import com.codesight.article.config.FeedProperties;
 import com.codesight.article.constant.FeedRedisKeys;
 import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.mapper.ArticleTagRelMapper;
@@ -32,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.DefaultTypedTuple;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -97,12 +99,32 @@ class ArticleFeedServiceTest {
     @Mock
     private ArticleRecommendVectorService articleRecommendVectorService;
 
+    private final FeedProperties feedProperties = new FeedProperties();
+
     private ArticleFeedService articleFeedService;
 
     @BeforeEach
     void setUp() {
         when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
         when(stringRedisTemplate.opsForSet()).thenReturn(setOperations);
+        when(zSetOperations.score(anyString(), anyString())).thenReturn(null);
+        when(stringRedisTemplate.executePipelined(any(SessionCallback.class)))
+                .thenAnswer(inv -> {
+                    SessionCallback<?> callback = inv.getArgument(0);
+                    List<Object> pipelineResults = new ArrayList<>();
+                    RedisOperations mockOps = mock(RedisOperations.class);
+                    ZSetOperations mockZSet = mock(ZSetOperations.class);
+                    when(mockOps.opsForZSet()).thenReturn(mockZSet);
+                    when(mockZSet.score(anyString(), anyString())).thenAnswer(scoreInv -> {
+                        String key = scoreInv.getArgument(0);
+                        String member = scoreInv.getArgument(1);
+                        Double score = zSetOperations.score(key, member);
+                        pipelineResults.add(score);
+                        return score;
+                    });
+                    callback.execute(mockOps);
+                    return pipelineResults;
+                });
         when(articleRecommendVectorService.recommendAndRerank(any(), anyList()))
                 .thenAnswer(inv -> inv.getArgument(1));
 
@@ -116,7 +138,8 @@ class ArticleFeedServiceTest {
                 stringRedisTemplate,
                 userFollowerMapper,
                 relationCacheService,
-                articleRecommendVectorService
+                articleRecommendVectorService,
+                feedProperties
         );
     }
 
@@ -277,6 +300,216 @@ class ArticleFeedServiceTest {
         assertTrue(decodedCursor.contains(":20")); // 第 20 条的文章 ID
     }
 
+    @Test
+    @DisplayName("测试推荐流绝对分值游标漂移防御：已读曝光过滤与顺延补拉（Buffer Fetch）")
+    void testFeedRecommendedWithExposedFilteringAndBufferFetch() {
+        Long userId = 999L;
+        Instant now = Instant.now();
+
+        // 模拟推荐池单次 Buffer Fetch 一步到位拉取候选集（其中 1 和 3 已读曝光）
+        List<TypedTuple<String>> tuples = List.of(
+                new DefaultTypedTuple<>("1", 100.0),
+                new DefaultTypedTuple<>("2", 90.0),
+                new DefaultTypedTuple<>("3", 80.0),
+                new DefaultTypedTuple<>("4", 70.0),
+                new DefaultTypedTuple<>("5", 60.0)
+        );
+
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt()))
+                .thenReturn(tuples);
+
+        // 模拟已读曝光判定：1 和 3 命中已读缓存，其余为 null
+        String exposedKey = FeedRedisKeys.getExposedKey(userId);
+        when(zSetOperations.score(eq(exposedKey), eq("1"))).thenReturn(1000.0);
+        when(zSetOperations.score(eq(exposedKey), eq("3"))).thenReturn(1000.0);
+
+        Article a2 = createArticle(2L, 200L, 1L, now, 100L, 10L);
+        Article a4 = createArticle(4L, 200L, 1L, now, 90L, 9L);
+        Article a5 = createArticle(5L, 200L, 1L, now, 80L, 8L);
+
+        when(articleMapper.selectByIds(eq(List.of(2L, 4L, 5L))))
+                .thenReturn(List.of(a2, a4, a5));
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .size(2)
+                .sortBy(FeedSortType.RECOMMENDED)
+                .build();
+
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, userId);
+
+        assertNotNull(response);
+        assertTrue(response.hasMore());
+        assertEquals(2, response.items().size());
+
+        // 验证已读文章 1 和 3 被剔除，顺延补拉出 2, 4
+        assertEquals(2L, response.items().get(0).getId());
+        assertEquals(4L, response.items().get(1).getId());
+
+        // 验证 nextCursor 指向第 2 条文章 (4L)
+        assertNotNull(response.nextCursor());
+        String decodedCursor = new String(Base64.getUrlDecoder().decode(response.nextCursor()), StandardCharsets.UTF_8);
+        assertTrue(decodedCursor.startsWith("rec:"));
+        assertTrue(decodedCursor.contains(":4"));
+    }
+
+    @Test
+    @DisplayName("测试推荐流 Buffer Fetch：过滤后数量恰好等于页大小但推荐池查满时，正确判定 hasMore 为 true")
+    void testFeedRecommendedBufferFetch_ExactPageSizeWithMoreInPool() {
+        Long userId = 999L;
+        Instant now = Instant.now();
+
+        // 构造满 fetchLimit(25) 的推荐池候选
+        List<TypedTuple<String>> tuples = new ArrayList<>();
+        for (int i = 1; i <= 25; i++) {
+            tuples.add(new DefaultTypedTuple<>(String.valueOf(i), 100.0 - i));
+        }
+
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt()))
+                .thenReturn(tuples);
+
+        // 前 23 篇已读曝光，仅 24 和 25 未读
+        String exposedKey = FeedRedisKeys.getExposedKey(userId);
+        for (int i = 1; i <= 23; i++) {
+            when(zSetOperations.score(eq(exposedKey), eq(String.valueOf(i)))).thenReturn(1000.0);
+        }
+
+        Article a24 = createArticle(24L, 200L, 1L, now, 100L, 10L);
+        Article a25 = createArticle(25L, 200L, 1L, now, 90L, 9L);
+        when(articleMapper.selectByIds(eq(List.of(24L, 25L)))).thenReturn(List.of(a24, a25));
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .size(2)
+                .sortBy(FeedSortType.RECOMMENDED)
+                .build();
+
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, userId);
+
+        assertNotNull(response);
+        assertEquals(2, response.items().size());
+        // 虽然过滤后条数恰好为 2 (不大于 size)，但因为 Redis 查满了 fetchLimit，判定仍有下一页
+        assertTrue(response.hasMore());
+        assertNotNull(response.nextCursor());
+        String decodedCursor = new String(Base64.getUrlDecoder().decode(response.nextCursor()), StandardCharsets.UTF_8);
+        assertTrue(decodedCursor.contains(":25"));
+    }
+
+    @Test
+    @DisplayName("测试推荐流极端场景：首轮缓冲因高曝光（重复20条）不足一页时，触发第二轮补拉凑满整页")
+    void testFeedRecommendedBufferFetch_ExtremeExposureTriggersTopupToFillPage() {
+        Long userId = 999L;
+        Instant now = Instant.now();
+
+        // 第 1 轮候选集 1~25 号
+        List<TypedTuple<String>> round1 = new ArrayList<>();
+        for (int i = 1; i <= 25; i++) {
+            round1.add(new DefaultTypedTuple<>(String.valueOf(i), 100.0 - i));
+        }
+
+        // 第 2 轮候选集 26~50 号
+        List<TypedTuple<String>> round2 = new ArrayList<>();
+        for (int i = 26; i <= 50; i++) {
+            round2.add(new DefaultTypedTuple<>(String.valueOf(i), 70.0 - (i - 25)));
+        }
+
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt()))
+                .thenReturn(round1);
+        when(recommendRankService.getRankedArticleIds(eq(75.0), eq(25L), anyInt()))
+                .thenReturn(round2);
+
+        // 模拟高密度曝光：第 1 轮 1~20 号（共 20 篇）全部曝光，21~25（仅 5 篇）未曝光
+        String exposedKey = FeedRedisKeys.getExposedKey(userId);
+        for (int i = 1; i <= 20; i++) {
+            when(zSetOperations.score(eq(exposedKey), eq(String.valueOf(i)))).thenReturn(1000.0);
+        }
+
+        // mock 查询数据库：为两轮未曝光文章构造实体
+        List<Article> articles = new ArrayList<>();
+        for (long id = 21; id <= 50; id++) {
+            articles.add(createArticle(id, 200L, 1L, now, 100L - id, 10L));
+        }
+        when(articleMapper.selectByIds(anyList())).thenReturn(articles);
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .size(10)
+                .sortBy(FeedSortType.RECOMMENDED)
+                .build();
+
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, userId);
+
+        assertNotNull(response);
+        // 验证通过第二轮补拉，成功凑满了请求的整页 10 条数据，杜绝了残缺半页
+        assertEquals(10, response.items().size());
+        assertTrue(response.hasMore());
+        assertEquals(21L, response.items().get(0).getId());
+        assertEquals(30L, response.items().get(9).getId());
+
+        // 验证确实发起了第二轮受控补拉
+        verify(recommendRankService, times(1)).getRankedArticleIds(eq(75.0), eq(25L), anyInt());
+    }
+
+    @Test
+    @DisplayName("测试未登录用户跳过推荐流已读曝光过滤")
+    void testFeedRecommendedAnonymousSkipsExposedFiltering() {
+        Instant now = Instant.now();
+        List<TypedTuple<String>> tuples = List.of(
+                new DefaultTypedTuple<>("10", 100.0),
+                new DefaultTypedTuple<>("20", 90.0)
+        );
+
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(2)))
+                .thenReturn(tuples);
+
+        Article a10 = createArticle(10L, 200L, 1L, now, 100L, 10L);
+        Article a20 = createArticle(20L, 200L, 1L, now, 90L, 9L);
+        when(articleMapper.selectByIds(List.of(10L, 20L))).thenReturn(List.of(a10, a20));
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .size(1)
+                .sortBy(FeedSortType.RECOMMENDED)
+                .build();
+
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, null);
+
+        assertNotNull(response);
+        assertTrue(response.hasMore());
+        assertEquals(1, response.items().size());
+        assertEquals(10L, response.items().getFirst().getId());
+        verify(zSetOperations, never()).score(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("测试推荐池文章全部已读后自动兜底至 MySQL 推荐流并过滤曝光")
+    void testFeedRecommendedAllExposedFallbackToMysql() {
+        Long userId = 999L;
+        Instant now = Instant.now();
+
+        // 推荐池仅 1 篇文章且已被曝光
+        List<TypedTuple<String>> poolTuples = List.of(
+                new DefaultTypedTuple<>("100", 50.0)
+        );
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt()))
+                .thenReturn(poolTuples);
+
+        String exposedKey = FeedRedisKeys.getExposedKey(userId);
+        when(zSetOperations.score(eq(exposedKey), eq("100"))).thenReturn(500.0);
+
+        // 兜底 MySQL 返回未曝光文章
+        Article mysqlArticle = createArticle(200L, 300L, 1L, now, 60L, 5L);
+        when(articleMapper.selectFeedRecommended(isNull(), isNull(), isNull(), any(Instant.class), isNull(), isNull(), eq(2)))
+                .thenReturn(List.of(mysqlArticle));
+
+        ArticleFeedRequest request = ArticleFeedRequest.builder()
+                .size(1)
+                .sortBy(FeedSortType.RECOMMENDED)
+                .build();
+
+        ArticleFeedPageResponse response = articleFeedService.getFeed(request, userId);
+
+        assertNotNull(response);
+        assertEquals(1, response.items().size());
+        assertEquals(200L, response.items().getFirst().getId());
+    }
+
 
     @Test
     @DisplayName("测试登录用户点赞状态水合：Pipeline 批量判定 isLiked 为 true")
@@ -361,7 +594,7 @@ class ArticleFeedServiceTest {
 
         // 验证 1：无条件写入发件箱 feed:outbox:1001 并截断
         verify(zSetOperations).add(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(String.valueOf(articleId)), eq((double) now.toEpochMilli()));
-        verify(zSetOperations).removeRange(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(0L), eq(-(FeedRedisKeys.OUTBOX_MAX_CAPACITY + 1L)));
+        verify(zSetOperations).removeRange(eq(FeedRedisKeys.getOutboxKey(authorId)), eq(0L), eq(-(feedProperties.getOutboxMaxCapacity() + 1L)));
 
         // 验证 2：触发了粉丝查询与 Pipeline 推送
         verify(userFollowerMapper).selectList(any());
@@ -560,7 +793,7 @@ class ArticleFeedServiceTest {
                 new DefaultTypedTuple<>("101", 1000.0),
                 new DefaultTypedTuple<>("102", 900.0)
         );
-        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(11))).thenReturn(tuples);
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt())).thenReturn(tuples);
         when(articleMapper.selectByIds(List.of(101L, 102L))).thenReturn(List.of(a1, a2));
  
         // 模拟 AI 模块精排：用户画像与 a2 契合度极高，重排为 [a2, a1]
@@ -590,7 +823,7 @@ class ArticleFeedServiceTest {
                 new DefaultTypedTuple<>("201", 1000.0),
                 new DefaultTypedTuple<>("202", 950.0)
         );
-        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(11))).thenReturn(tuples);
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt())).thenReturn(tuples);
         when(articleMapper.selectByIds(List.of(201L, 202L))).thenReturn(List.of(cleanArticle, softArticle));
 
         // 模拟 AI 模块负向语义剪枝：剔除 202 同质营销软文，仅保留 201

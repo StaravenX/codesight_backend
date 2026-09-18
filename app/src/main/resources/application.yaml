@@ -2,7 +2,7 @@ spring:
   application:
     name: codesight_backend
   profiles:
-    include: auth, storage, ai, search
+    include: auth, storage, ai, search, article
   elasticsearch:
     uri: ${ES_URI:http://localhost:9200}
     username: ${ES_USERNAME}

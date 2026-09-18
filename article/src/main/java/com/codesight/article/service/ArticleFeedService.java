@@ -22,6 +22,7 @@ import com.codesight.user.UserCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.codesight.article.constant.FeedRedisKeys;
+import com.codesight.article.config.FeedProperties;
 import com.codesight.relation.mapper.UserFollowerMapper;
 import com.codesight.relation.model.UserFollower;
 import com.codesight.relation.service.RelationCacheService;
@@ -62,6 +63,7 @@ public class ArticleFeedService {
     private final UserFollowerMapper userFollowerMapper;
     private final RelationCacheService relationCacheService;
     private final ArticleRecommendVectorService articleRecommendVectorService;
+    private final FeedProperties feedProperties;
 
     /**
      * 获取文章信息流（推荐、最新、关注三大分支）
@@ -93,18 +95,45 @@ public class ArticleFeedService {
             Double cursorRankScore = cursor != null ? (double) cursor.value() : null;
             Long cursorArticleId = cursor != null ? cursor.articleId() : null;
 
-            List<TypedTuple<String>> tuples = recommendRankService.getRankedArticleIds(cursorRankScore, cursorArticleId, limitSize);
-            if (!tuples.isEmpty()) {
-                Map<Long, Double> scoreMap = new HashMap<>(tuples.size());
-                List<Long> articleIds = new ArrayList<>(tuples.size());
+            List<Long> articleIds = new ArrayList<>();
+            Map<Long, Double> scoreMap = new HashMap<>();
+            int maxRounds = (currentUserId != null) ? 3 : 1;
+            boolean poolExhausted = false;
+
+            while (maxRounds-- > 0 && articleIds.size() < request.size()) {
+                int need = limitSize - articleIds.size();
+                int fetchLimit = currentUserId != null ? Math.max(need * 2, 25) : need;
+                List<TypedTuple<String>> tuples = recommendRankService.getRankedArticleIds(cursorRankScore, cursorArticleId, fetchLimit);
+                if (tuples.isEmpty()) {
+                    poolExhausted = true;
+                    break;
+                }
+
+                List<Long> batchIds = new ArrayList<>(tuples.size());
                 for (TypedTuple<String> t : tuples) {
                     if (t.getValue() != null) {
                         Long id = Long.parseLong(t.getValue());
-                        articleIds.add(id);
+                        batchIds.add(id);
                         scoreMap.put(id, t.getScore() != null ? t.getScore() : 0.0);
                     }
                 }
 
+                // 推进游标至当前批次末尾元素
+                TypedTuple<String> lastTuple = tuples.getLast();
+                cursorRankScore = lastTuple.getScore();
+                cursorArticleId = lastTuple.getValue() != null ? Long.parseLong(lastTuple.getValue()) : null;
+
+                // 过滤已读曝光文章
+                List<Long> unexposed = filterUnexposedIds(currentUserId, batchIds);
+                articleIds.addAll(unexposed);
+
+                if (tuples.size() < fetchLimit) {
+                    poolExhausted = true;
+                    break;
+                }
+            }
+
+            if (!articleIds.isEmpty()) {
                 List<Article> dbArticles = articleMapper.selectByIds(articleIds);
                 if (dbArticles != null && !dbArticles.isEmpty()) {
                     Map<Long, Article> articleMap = dbArticles.stream()
@@ -120,25 +149,22 @@ public class ArticleFeedService {
                         }
                     }
 
-                    if (!sorted.isEmpty()) {
-                        // 双向向量感知推荐（负向语义剪枝 + 正向加权精排）
-                        List<Article> reranked = articleRecommendVectorService.recommendAndRerank(currentUserId, sorted);
+                    // 双向向量感知推荐（负向语义剪枝 + 正向加权精排）
+                    List<Article> reranked = articleRecommendVectorService.recommendAndRerank(currentUserId, sorted);
+                    if (!reranked.isEmpty()) {
+                        boolean hasMore = reranked.size() > request.size() || !poolExhausted;
+                        List<Article> paged = reranked.size() > request.size() ? reranked.subList(0, request.size()) : reranked;
 
-                        if (!reranked.isEmpty()) {
-                            boolean hasMore = reranked.size() > request.size();
-                            List<Article> paged = hasMore ? reranked.subList(0, request.size()) : reranked;
-
-                            String nextCursor = null;
-                            if (hasMore && !paged.isEmpty()) {
-                                Article last = paged.getLast();
-                                Double lastScore = last.getRankScore();
-                                long scoreVal = lastScore != null ? lastScore.longValue() : 0L;
-                                nextCursor = buildCursor(CURSOR_PREFIX_RECOMMENDED, scoreVal, last.getId());
-                            }
-
-                            List<ArticleFeedItemResponse> items = hydrateFeedItems(paged, currentUserId);
-                            return new ArticleFeedPageResponse(items, nextCursor, hasMore);
+                        String nextCursor = null;
+                        if (hasMore && !paged.isEmpty()) {
+                            Article last = paged.getLast();
+                            long scoreVal = last.getRankScore() != null ? last.getRankScore().longValue() : 0L;
+                            nextCursor = buildCursor(CURSOR_PREFIX_RECOMMENDED, scoreVal, last.getId());
                         }
+
+                        recordExposed(currentUserId, paged.stream().map(Article::getId).toList());
+                        List<ArticleFeedItemResponse> items = hydrateFeedItems(paged, currentUserId);
+                        return new ArticleFeedPageResponse(items, nextCursor, hasMore);
                     }
                 }
             }
@@ -370,7 +396,7 @@ public class ArticleFeedService {
         // 2. 写入发件箱
         String outboxKey = FeedRedisKeys.getOutboxKey(authorId);
         stringRedisTemplate.opsForZSet().add(outboxKey, String.valueOf(articleId), publishTimeMs);
-        stringRedisTemplate.opsForZSet().removeRange(outboxKey, 0, -(FeedRedisKeys.OUTBOX_MAX_CAPACITY + 1));
+        stringRedisTemplate.opsForZSet().removeRange(outboxKey, 0, -(feedProperties.getOutboxMaxCapacity() + 1));
 
         // 3. 判定博主粉丝数
         Map<CounterSchema.MetricItem, Long> userCounts = counterService.getCounts(
@@ -410,7 +436,7 @@ public class ArticleFeedService {
                 for (Long fanId : fanIds) {
                     String inboxKey = FeedRedisKeys.getInboxKey(fanId);
                     operations.opsForZSet().add(inboxKey, String.valueOf(articleId), publishTimeMs);
-                    operations.opsForZSet().removeRange(inboxKey, 0, -(FeedRedisKeys.INBOX_MAX_CAPACITY + 1));
+                    operations.opsForZSet().removeRange(inboxKey, 0, -(feedProperties.getInboxMaxCapacity() + 1));
                 }
                 return null;
             }
@@ -580,11 +606,11 @@ public class ArticleFeedService {
      * @return true 表示为大 V（拉模式），false 表示为普通博主（推模式）
      */
     public boolean isBigV(Long authorId, long followerCount) {
-        if (followerCount >= FeedRedisKeys.BIG_V_PROMOTION_THRESHOLD) {
+        if (followerCount >= feedProperties.getBigVPromotionThreshold()) {
             stringRedisTemplate.opsForSet().add(FeedRedisKeys.BIG_V_SET_KEY, String.valueOf(authorId));
             return true;
         }
-        if (followerCount < FeedRedisKeys.BIG_V_DEMOTION_THRESHOLD) {
+        if (followerCount < feedProperties.getBigVDemotionThreshold()) {
             Long removed = stringRedisTemplate.opsForSet().remove(FeedRedisKeys.BIG_V_SET_KEY, String.valueOf(authorId));
             if (removed != null && removed > 0) {
                 // 异步触发发件箱历史文章回填粉丝收件箱
@@ -657,7 +683,7 @@ public class ArticleFeedService {
                             operations.opsForZSet().add(inboxKey, tuple.getValue(), tuple.getScore());
                         }
                     }
-                    operations.opsForZSet().removeRange(inboxKey, 0, -(FeedRedisKeys.INBOX_MAX_CAPACITY + 1));
+                    operations.opsForZSet().removeRange(inboxKey, 0, -(feedProperties.getInboxMaxCapacity() + 1));
                 }
                 return null;
             }
@@ -725,7 +751,7 @@ public class ArticleFeedService {
                         }
                     }
                 }
-                operations.opsForZSet().removeRange(inboxKey, 0, -(FeedRedisKeys.INBOX_MAX_CAPACITY + 1));
+                operations.opsForZSet().removeRange(inboxKey, 0, -(feedProperties.getInboxMaxCapacity() + 1));
                 return null;
             }
         });
@@ -762,6 +788,72 @@ public class ArticleFeedService {
         // 2. 从粉丝收件箱中批量移除该博主的所有文章
         String inboxKey = FeedRedisKeys.getInboxKey(followerId);
         stringRedisTemplate.opsForZSet().remove(inboxKey, articleIds.toArray(new Object[0]));
+    }
+
+    /**
+     * 过滤当前用户已曝光的文章 ID 列表
+     */
+    private List<Long> filterUnexposedIds(Long userId, List<Long> articleIds) {
+        if (userId == null || articleIds == null || articleIds.isEmpty()) {
+            return articleIds != null ? articleIds : Collections.emptyList();
+        }
+        try {
+            String exposedKey = FeedRedisKeys.getExposedKey(userId);
+            List<Object> results = stringRedisTemplate.executePipelined(new SessionCallback<>() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public Object execute(@NonNull RedisOperations operations) {
+                    for (Long id : articleIds) {
+                        operations.opsForZSet().score(exposedKey, String.valueOf(id));
+                    }
+                    return null;
+                }
+            });
+
+            if (results.isEmpty()) {
+                return articleIds;
+            }
+
+            List<Long> unexposed = new ArrayList<>(articleIds.size());
+            for (int i = 0; i < articleIds.size(); i++) {
+                if (i >= results.size() || results.get(i) == null) {
+                    unexposed.add(articleIds.get(i));
+                }
+            }
+            return unexposed;
+        } catch (Exception e) {
+            log.warn("查询用户推荐曝光缓存失败, userId={}, error={}", userId, e.getMessage());
+            return articleIds;
+        }
+    }
+
+
+
+    /**
+     * 批量记录用户已曝光文章并维护容量上限
+     */
+    private void recordExposed(Long userId, List<Long> articleIds) {
+        if (userId == null || articleIds == null || articleIds.isEmpty()) {
+            return;
+        }
+        try {
+            String exposedKey = FeedRedisKeys.getExposedKey(userId);
+            long now = System.currentTimeMillis();
+            stringRedisTemplate.executePipelined(new SessionCallback<>() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public Object execute(@NonNull RedisOperations operations) {
+                    for (Long id : articleIds) {
+                        operations.opsForZSet().add(exposedKey, String.valueOf(id), (double) now);
+                    }
+                    operations.expire(exposedKey, feedProperties.getExposedTtl());
+                    operations.opsForZSet().removeRange(exposedKey, 0, -(feedProperties.getExposedMaxCapacity() + 1));
+                    return null;
+                }
+            });
+        } catch (Exception e) {
+            log.warn("记录用户推荐曝光失败, userId={}, error={}", userId, e.getMessage());
+        }
     }
 
     private record FeedCursor(long value, long articleId) {}
