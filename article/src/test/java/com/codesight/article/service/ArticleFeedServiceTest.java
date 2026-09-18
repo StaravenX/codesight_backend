@@ -128,18 +128,37 @@ class ArticleFeedServiceTest {
         when(articleRecommendVectorService.recommendAndRerank(any(), anyList()))
                 .thenAnswer(inv -> inv.getArgument(1));
 
-        articleFeedService = new ArticleFeedService(
-                articleMapper,
-                articleTagRelMapper,
-                tagMapper,
+        ArticleFeedHydrator hydrator = new ArticleFeedHydrator(
                 userCacheService,
                 counterService,
+                articleTagRelMapper,
+                tagMapper
+        );
+
+        ArticleRecommendFeedService recommendFeedService = new ArticleRecommendFeedService(
+                articleMapper,
                 recommendRankService,
                 stringRedisTemplate,
+                articleRecommendVectorService,
+                feedProperties,
+                hydrator
+        );
+
+        ArticleFollowingFeedService followingFeedService = new ArticleFollowingFeedService(
+                articleMapper,
                 userFollowerMapper,
                 relationCacheService,
-                articleRecommendVectorService,
-                feedProperties
+                counterService,
+                stringRedisTemplate,
+                feedProperties,
+                hydrator
+        );
+
+        articleFeedService = new ArticleFeedService(
+                articleMapper,
+                recommendFeedService,
+                followingFeedService,
+                hydrator
         );
     }
 
