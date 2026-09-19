@@ -62,6 +62,17 @@ public class ArticleVectorService {
     }
 
     /**
+     * 移除用户反馈样本
+     */
+    public void removeFeedback(FeedbackType type, Long userId, Long articleId) {
+        if (type == null || userId == null || articleId == null) {
+            return;
+        }
+        String key = type.getKeyPrefix() + userId;
+        stringRedisTemplate.opsForZSet().remove(key, articleId.toString());
+    }
+
+    /**
      * 根据文章结构化文本生成并持久化向量资产
      */
     public float[] generateAndSaveVector(Long articleId, String title, String summary, String content) {
