@@ -49,6 +49,13 @@ public class CounterSchema {
          */
         boolean isBitmapBacked();
 
+        /**
+         * 是否为只增累加型指标
+         */
+        default boolean isAccumulative() {
+            return false;
+        }
+
         default int offset() {
             return getIndex() * FIELD_SIZE;
         }
@@ -60,7 +67,12 @@ public class CounterSchema {
     @Getter
     @AllArgsConstructor
     public enum ArticleMetric implements MetricItem {
-        VIEWS(0, "views", false),
+        VIEWS(0, "views", false) {
+            @Override
+            public boolean isAccumulative() {
+                return true;
+            }
+        },
         LIKE(1, "like", true),
         COMMENT(2, "comment", false),
         FAVORITE(3, "favorite", true);

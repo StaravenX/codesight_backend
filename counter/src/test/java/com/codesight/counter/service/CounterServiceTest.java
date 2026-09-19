@@ -268,4 +268,44 @@ class CounterServiceTest {
 
         verify(eventProducer, never()).publish(any());
     }
+
+    @Test
+    @DisplayName("测试 rebuild：Merge-On-Rebuild 原子吸收暂存桶未落盘在途增量")
+    void testRebuildMergeAccumulativePendingDelta() throws InterruptedException {
+        when(stringRedisTemplate.execute(any(RedisCallback.class))).thenReturn(null);
+
+        when(redisson.getLock(anyString())).thenReturn(lock);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(lock.isHeldByCurrentThread()).thenReturn(true);
+
+        // 模拟底表真值（MySQL 基线落后）：阅读量 1000，点赞量 800
+        Map<CounterSchema.MetricItem, Long> rebuilderResult = new HashMap<>();
+        rebuilderResult.put(CounterSchema.ArticleMetric.VIEWS, 1000L);
+        rebuilderResult.put(CounterSchema.ArticleMetric.LIKE, 800L);
+        rebuilderResult.put(CounterSchema.ArticleMetric.COMMENT, 10L);
+        rebuilderResult.put(CounterSchema.ArticleMetric.FAVORITE, 50L);
+        when(mockArticleRebuilder.rebuild("1001")).thenReturn(rebuilderResult);
+
+        // 模拟 Redis Hash 暂存桶中有未落盘在途增量：views 字段 (index 0) = 50，like 字段 (index 1) = 5
+        Map<Object, Object> pendingEntries = new HashMap<>();
+        pendingEntries.put("0", "50");
+        pendingEntries.put("1", "5");
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+        when(hashOperations.entries(anyString())).thenReturn(pendingEntries);
+
+        Map<CounterSchema.MetricItem, Long> counts = counterService.rebuild(CounterSchema.EntityType.ARTICLE, "1001");
+
+        assertNotNull(counts);
+        // 累加型指标 VIEWS 必须原子吸收在途增量 50 -> 1050
+        assertEquals(1050L, counts.get(CounterSchema.ArticleMetric.VIEWS));
+        // 状态型指标 LIKE 采用位图真值，不吸收暂存桶增量 -> 800
+        assertEquals(800L, counts.get(CounterSchema.ArticleMetric.LIKE));
+        assertEquals(10L, counts.get(CounterSchema.ArticleMetric.COMMENT));
+        assertEquals(50L, counts.get(CounterSchema.ArticleMetric.FAVORITE));
+
+        // 验证清理了聚合桶字段
+        verify(hashOperations, times(1)).delete(anyString(), eq("0"));
+        verify(hashOperations, times(1)).delete(anyString(), eq("1"));
+        verify(lock, times(1)).unlock();
+    }
 }

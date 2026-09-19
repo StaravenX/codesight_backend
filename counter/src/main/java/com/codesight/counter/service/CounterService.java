@@ -304,21 +304,38 @@ public class CounterService {
                     ? rebuilder.rebuild(entityId)
                     : getDefaultZeroCounts(entityType);
 
+            String aggKey = CounterKeys.aggKey(entityType, entityId);
+            Map<Object, Object> pendingEntries = stringRedisTemplate.opsForHash().entries(aggKey);
+
             byte[] newSds = new byte[CounterSchema.TOTAL_BYTES];
+            Map<CounterSchema.MetricItem, Long> finalResult = new HashMap<>(result);
 
             for (CounterSchema.MetricItem m : metrics) {
-                long val = result.getOrDefault(m, 0L);
-                CounterSchema.writeInt32BE(newSds, m.offset(), val);
+                long baseVal = result.getOrDefault(m, 0L);
+                long pendingDelta = 0L;
+                if (pendingEntries != null && !pendingEntries.isEmpty()) {
+                    Object pendingVal = pendingEntries.get(String.valueOf(m.getIndex()));
+                    if (pendingVal != null) {
+                        try {
+                            pendingDelta = Long.parseLong(pendingVal.toString());
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+
+                // 累加型指标吸收暂存桶未落盘增量，位图事实型指标采用扫描真值
+                long finalVal = m.isAccumulative() ? Math.max(0L, baseVal + pendingDelta) : baseVal;
+                finalResult.put(m, finalVal);
+                CounterSchema.writeInt32BE(newSds, m.offset(), finalVal);
 
                 // 清理 Hash 聚合桶中的对应字段，防止重复加算
-                String aggKey = CounterKeys.aggKey(entityType, entityId);
                 stringRedisTemplate.opsForHash().delete(aggKey, String.valueOf(m.getIndex()));
             }
 
             // 回填 16 字节 SDS 快照
             setRawBytes(sdsKey, newSds);
 
-            return result;
+            return finalResult;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("自愈重建被中断: entityType={}, entityId={}", entityType, entityId, e);
