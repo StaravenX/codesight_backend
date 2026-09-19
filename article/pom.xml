@@ -42,10 +42,10 @@
             <artifactId>relation</artifactId>
         </dependency>
 
-        <!-- ai -->
+        <!-- ai-core -->
         <dependency>
             <groupId>com.codesight</groupId>
-            <artifactId>ai</artifactId>
+            <artifactId>ai-core</artifactId>
         </dependency>
 
         <!-- MyBatisPlus -->

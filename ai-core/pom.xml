@@ -7,9 +7,9 @@
         <artifactId>codesight_backend</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>ai</artifactId>
-    <name>ai</name>
-    <description>AI</description>
+    <artifactId>ai-core</artifactId>
+    <name>ai-core</name>
+    <description>AI 基础设施层：向量资产、Embedding 模型与余弦算子</description>
 
     <dependencies>
         <!-- Common -->
@@ -18,16 +18,16 @@
             <artifactId>common</artifactId>
         </dependency>
 
-        <!-- AI Core -->
-        <dependency>
-            <groupId>com.codesight</groupId>
-            <artifactId>ai-core</artifactId>
-        </dependency>
-
-        <!-- Spring AI OpenAI Starter -->
+        <!-- Spring AI OpenAI Starter (用于 EmbeddingModel) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
+        <!-- Spring Data Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
     </dependencies>
 

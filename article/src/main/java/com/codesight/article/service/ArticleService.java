@@ -17,6 +17,7 @@ import com.codesight.article.util.MarkdownParseResult;
 import com.codesight.article.util.MarkdownParser;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
+import com.codesight.ai.service.ArticleVectorService;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class ArticleService {
     private final RecommendRankService recommendRankService;
     private final ArticleFeedService articleFeedService;
     private final ArticleEventProducer articleEventProducer;
+    private final ArticleVectorService articleVectorService;
 
     @Transactional(rollbackFor = Exception.class)
     public ArticleCreateResponse createArticle(ArticleCreateRequest request, Long authorId) {
@@ -369,5 +371,15 @@ public class ArticleService {
                     .build();
             articleTagRelMapper.insert(rel);
         }
+    }
+
+    /**
+     * 记录用户对文章的负向反馈（不感兴趣）
+     */
+    public void recordDislike(Long userId, Long articleId) {
+        if (userId == null || articleId == null) {
+            return;
+        }
+        articleVectorService.recordFeedback(ArticleVectorService.FeedbackType.NEGATIVE, userId, articleId);
     }
 }

@@ -30,10 +30,10 @@
             <artifactId>article</artifactId>
         </dependency>
 
-        <!-- AI -->
+        <!-- AI Core -->
         <dependency>
             <groupId>com.codesight</groupId>
-            <artifactId>ai</artifactId>
+            <artifactId>ai-core</artifactId>
         </dependency>
 
         <!-- User -->
