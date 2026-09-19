@@ -98,5 +98,41 @@ public class ArticleController {
             @CurrentUserId(required = false) Long userId) {
         return articleFeedService.getFeed(request, userId);
     }
+
+    /**
+     * 文章点赞/取消点赞
+     *
+     * @param id     目标文章 ID
+     * @param isLike true 为点赞，false 为取消点赞
+     * @param userId 当前登录用户 ID
+     * @return 操作后状态是否翻转成功
+     */
+    @PostMapping("/{id}/like")
+    @Operation(summary = "文章点赞/取消点赞", description = "基于位图原子翻转判重，状态真实改变时联动创作者获赞量")
+    @RateLimit(maxRequests = 60)
+    public boolean toggleLike(
+            @PathVariable("id") Long id,
+            @RequestParam("isLike") boolean isLike,
+            @Parameter(hidden = true) @CurrentUserId Long userId) {
+        return articleService.toggleLike(id, userId, isLike);
+    }
+
+    /**
+     * 文章收藏/取消收藏
+     *
+     * @param id         目标文章 ID
+     * @param isFavorite true 为收藏，false 为取消收藏
+     * @param userId     当前登录用户 ID
+     * @return 操作后状态是否翻转成功
+     */
+    @PostMapping("/{id}/favorite")
+    @Operation(summary = "文章收藏/取消收藏", description = "基于位图原子翻转判重，防刷幂等")
+    @RateLimit(maxRequests = 60)
+    public boolean toggleFavorite(
+            @PathVariable("id") Long id,
+            @RequestParam("isFavorite") boolean isFavorite,
+            @Parameter(hidden = true) @CurrentUserId Long userId) {
+        return articleService.toggleFavorite(id, userId, isFavorite);
+    }
 }
 

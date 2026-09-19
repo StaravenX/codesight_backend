@@ -201,10 +201,11 @@ public class CounterService {
      *
      * @param entityType 业务实体类型（如 "article"）
      * @param entityId   业务实体唯一标识
+     * @param ownerId    实体归属人 ID（如文章作者 ID，可为空）
      * @param userId     当前登录用户 ID（可为空）
-     * @param clientIp   客户端 IP 地址（游客防刷依据）
+     * @param clientIp   客户端 IP 地址
      */
-    public void increaseView(CounterSchema.EntityType entityType, String entityId, Long userId, String clientIp) {
+    public void increaseView(CounterSchema.EntityType entityType, String entityId, String ownerId, Long userId, String clientIp) {
         String identifier = (userId != null) ? "u:" + userId : "ip:" + (clientIp != null ? clientIp : "unknown");
         String dedupKey = CounterKeys.pvDedupKey(entityType, entityId, identifier);
 
@@ -218,6 +219,15 @@ public class CounterService {
                     userId != null ? userId : 0L,
                     1
             );
+            if (entityType == CounterSchema.EntityType.ARTICLE && ownerId != null && !ownerId.isBlank()) {
+                increase(
+                        CounterSchema.EntityType.USER,
+                        ownerId,
+                        CounterSchema.UserMetric.VIEWS_RECEIVED,
+                        userId != null ? userId : 0L,
+                        1
+                );
+            }
         }
     }
 
@@ -313,7 +323,7 @@ public class CounterService {
             for (CounterSchema.MetricItem m : metrics) {
                 long baseVal = result.getOrDefault(m, 0L);
                 long pendingDelta = 0L;
-                if (pendingEntries != null && !pendingEntries.isEmpty()) {
+                if (!pendingEntries.isEmpty()) {
                     Object pendingVal = pendingEntries.get(String.valueOf(m.getIndex()));
                     if (pendingVal != null) {
                         try {

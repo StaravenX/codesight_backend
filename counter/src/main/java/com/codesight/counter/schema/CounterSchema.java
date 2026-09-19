@@ -80,6 +80,18 @@ public class CounterSchema {
         private final int index;
         private final String code;
         private final boolean bitmapBacked;
+
+        private static final Map<String, ArticleMetric> VALUE_MAP = new HashMap<>();
+
+        static {
+            for (ArticleMetric item : values()) {
+                VALUE_MAP.put(item.code.toLowerCase(), item);
+            }
+        }
+
+        public static ArticleMetric fromCode(String code) {
+            return code != null ? VALUE_MAP.get(code.toLowerCase()) : null;
+        }
     }
 
     /**
@@ -88,8 +100,18 @@ public class CounterSchema {
     @Getter
     @AllArgsConstructor
     public enum UserMetric implements MetricItem {
-        VIEWS_RECEIVED(0, "viewsReceived", false),
-        LIKES_RECEIVED(1, "likesReceived", false),
+        VIEWS_RECEIVED(0, "viewsReceived", false) {
+            @Override
+            public boolean isAccumulative() {
+                return true;
+            }
+        },
+        LIKES_RECEIVED(1, "likesReceived", false) {
+            @Override
+            public boolean isAccumulative() {
+                return true;
+            }
+        },
         FOLLOWERS(2, "followers", true),
         FOLLOWINGS(3, "followings", true);
 

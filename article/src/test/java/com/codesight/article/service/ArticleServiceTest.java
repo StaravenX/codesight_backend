@@ -258,6 +258,9 @@ public class ArticleServiceTest {
         assertNotNull(response.getTags());
         assertEquals(1, response.getTags().size());
         assertEquals("Java", response.getTags().getFirst().name());
+
+        // 验证触发了阅读量与创作者画像防抖自增
+        verify(counterService, times(1)).increaseView(CounterSchema.EntityType.ARTICLE, "1001", "888", 100L, null);
     }
 
     @Test
@@ -268,5 +271,86 @@ public class ArticleServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> articleService.getDetail(999L, 100L));
         assertEquals(ErrorCode.ARTICLE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("测试文章点赞成功并联动创作者获赞数")
+    void testToggleLike_Success() {
+        ArticleDetailStatic staticDto = ArticleDetailStatic.builder()
+                .id(1001L)
+                .authorId(888L)
+                .build();
+        when(articleCacheService.getStaticDetail(1001L)).thenReturn(staticDto);
+        when(counterService.toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE, 100L, true))
+                .thenReturn(true);
+
+        boolean result = articleService.toggleLike(1001L, 100L, true);
+
+        assertTrue(result);
+        verify(counterService, times(1)).increase(
+                CounterSchema.EntityType.USER,
+                "888",
+                CounterSchema.UserMetric.LIKES_RECEIVED,
+                100L,
+                1
+        );
+    }
+
+    @Test
+    @DisplayName("测试文章取消点赞成功并联动扣减创作者获赞数")
+    void testToggleLike_CancelLike() {
+        ArticleDetailStatic staticDto = ArticleDetailStatic.builder()
+                .id(1001L)
+                .authorId(888L)
+                .build();
+        when(articleCacheService.getStaticDetail(1001L)).thenReturn(staticDto);
+        when(counterService.toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE, 100L, false))
+                .thenReturn(true);
+
+        boolean result = articleService.toggleLike(1001L, 100L, false);
+
+        assertTrue(result);
+        verify(counterService, times(1)).increase(
+                CounterSchema.EntityType.USER,
+                "888",
+                CounterSchema.UserMetric.LIKES_RECEIVED,
+                100L,
+                -1
+        );
+    }
+
+    @Test
+    @DisplayName("测试重复点赞幂等拦截：不联动创作者获赞数")
+    void testToggleLike_IdempotentIgnored() {
+        ArticleDetailStatic staticDto = ArticleDetailStatic.builder()
+                .id(1001L)
+                .authorId(888L)
+                .build();
+        when(articleCacheService.getStaticDetail(1001L)).thenReturn(staticDto);
+        when(counterService.toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.LIKE, 100L, true))
+                .thenReturn(false);
+
+        boolean result = articleService.toggleLike(1001L, 100L, true);
+
+        assertFalse(result);
+        verify(counterService, never()).increase(eq(CounterSchema.EntityType.USER), anyString(), any(), anyLong(), anyInt());
+    }
+
+    @Test
+    @DisplayName("测试文章收藏与取消收藏")
+    void testToggleFavorite_Success() {
+        ArticleDetailStatic staticDto = ArticleDetailStatic.builder()
+                .id(1001L)
+                .authorId(888L)
+                .build();
+        when(articleCacheService.getStaticDetail(1001L)).thenReturn(staticDto);
+        when(counterService.toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.FAVORITE, 100L, true))
+                .thenReturn(true);
+
+        boolean result = articleService.toggleFavorite(1001L, 100L, true);
+
+        assertTrue(result);
+        verify(counterService, times(1)).toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.FAVORITE, 100L, true);
+        verify(counterService, never()).increase(eq(CounterSchema.EntityType.USER), anyString(), any(), anyLong(), anyInt());
     }
 }

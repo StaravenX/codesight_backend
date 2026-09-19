@@ -42,7 +42,15 @@ public class RecommendRankConsumer {
             }
 
             Long articleId = Long.parseLong(event.entityId());
-            double weight = getMetricWeight(event.metric());
+            CounterSchema.ArticleMetric metric = CounterSchema.ArticleMetric.fromCode(event.metric());
+            if (metric == null) {
+                if (ack != null) {
+                    ack.acknowledge();
+                }
+                return;
+            }
+
+            double weight = getMetricWeight(metric);
             double deltaScore = weight * event.delta();
 
             if (deltaScore != 0.0) {
@@ -73,16 +81,15 @@ public class RecommendRankConsumer {
         }
     }
 
-    private double getMetricWeight(String metric) {
+    private double getMetricWeight(CounterSchema.ArticleMetric metric) {
         if (metric == null) {
             return 0.0;
         }
-        return switch (metric.toLowerCase()) {
-            case "views", "view" -> 1.0;
-            case "like", "likes" -> 5.0;
-            case "favorite", "favorites", "collect" -> 8.0;
-            case "comment", "comments" -> 10.0;
-            default -> 0.0;
+        return switch (metric) {
+            case VIEWS -> 1.0;
+            case LIKE -> 5.0;
+            case FAVORITE -> 8.0;
+            case COMMENT -> 10.0;
         };
     }
 }

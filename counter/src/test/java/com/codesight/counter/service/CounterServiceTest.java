@@ -224,7 +224,7 @@ class CounterServiceTest {
         when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:u:888"), eq("1"), any(Duration.class)))
                 .thenReturn(true);
 
-        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", 888L, "127.0.0.1");
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", null, 888L, "127.0.0.1");
 
         ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
         verify(eventProducer, times(1)).publish(captor.capture());
@@ -244,7 +244,7 @@ class CounterServiceTest {
         when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:ip:192.168.1.100"), eq("1"), any(Duration.class)))
                 .thenReturn(true);
 
-        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", null, "192.168.1.100");
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", null, null, "192.168.1.100");
 
         ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
         verify(eventProducer, times(1)).publish(captor.capture());
@@ -264,7 +264,7 @@ class CounterServiceTest {
         when(valueOperations.setIfAbsent(anyString(), eq("1"), any(Duration.class)))
                 .thenReturn(false);
 
-        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", 888L, "127.0.0.1");
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", null, 888L, "127.0.0.1");
 
         verify(eventProducer, never()).publish(any());
     }
@@ -307,5 +307,37 @@ class CounterServiceTest {
         verify(hashOperations, times(1)).delete(anyString(), eq("0"));
         verify(hashOperations, times(1)).delete(anyString(), eq("1"));
         verify(lock, times(1)).unlock();
+    }
+
+    @Test
+    @DisplayName("测试 increaseView 联动：放行时原子投递文章与创作者阅读事件")
+    void testIncreaseArticleViewSuccess() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(eq("pv:dedup:article:1001:u:888"), eq("1"), any(Duration.class)))
+                .thenReturn(true);
+
+        counterService.increaseView(CounterSchema.EntityType.ARTICLE, "1001", "2001", 888L, "127.0.0.1");
+
+        ArgumentCaptor<CounterEvent> captor = ArgumentCaptor.forClass(CounterEvent.class);
+        verify(eventProducer, times(2)).publish(captor.capture());
+
+        List<CounterEvent> events = captor.getAllValues();
+        assertEquals(2, events.size());
+
+        // 文章维度事件
+        CounterEvent articleEvent = events.getFirst();
+        assertEquals(CounterSchema.EntityType.ARTICLE, articleEvent.entityType());
+        assertEquals("1001", articleEvent.entityId());
+        assertEquals("views", articleEvent.metric());
+        assertEquals(888L, articleEvent.userId());
+        assertEquals(1, articleEvent.delta());
+
+        // 创作者维度事件
+        CounterEvent userEvent = events.get(1);
+        assertEquals(CounterSchema.EntityType.USER, userEvent.entityType());
+        assertEquals("2001", userEvent.entityId());
+        assertEquals("viewsReceived", userEvent.metric());
+        assertEquals(888L, userEvent.userId());
+        assertEquals(1, userEvent.delta());
     }
 }

@@ -239,6 +239,15 @@ public class ArticleService {
                 throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND, "文章不存在或已被删除");
             }
 
+            // 触发文章与作者阅读量自增
+            counterService.increaseView(
+                    CounterSchema.EntityType.ARTICLE,
+                    String.valueOf(id),
+                    String.valueOf(staticDto.getAuthorId()),
+                    userId,
+                    null
+            );
+
             // 获取计数与互动状态
             Map<CounterSchema.MetricItem, Long> counts = countsFuture.get();
             Boolean isLiked = isLikedFuture.get();
@@ -264,6 +273,63 @@ public class ArticleService {
             log.error("获取文章详情并发聚合失败: articleId={}", id, e);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "获取文章详情失败");
         }
+    }
+
+    /**
+     * 文章点赞/取消点赞
+     *
+     * @param articleId 目标文章 ID
+     * @param userId    当前登录用户 ID
+     * @param isLike    true 为点赞，false 为取消点赞
+     * @return 操作后状态是否翻转成功
+     */
+    public boolean toggleLike(Long articleId, Long userId, boolean isLike) {
+        ArticleDetailStatic staticDetail = articleCacheService.getStaticDetail(articleId);
+        if (staticDetail == null) {
+            throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND, "文章不存在或已被删除");
+        }
+
+        boolean changed = counterService.toggle(
+                CounterSchema.EntityType.ARTICLE,
+                String.valueOf(articleId),
+                CounterSchema.ArticleMetric.LIKE,
+                userId,
+                isLike
+        );
+
+        if (changed && staticDetail.getAuthorId() != null) {
+            counterService.increase(
+                    CounterSchema.EntityType.USER,
+                    String.valueOf(staticDetail.getAuthorId()),
+                    CounterSchema.UserMetric.LIKES_RECEIVED,
+                    userId,
+                    isLike ? 1 : -1
+            );
+        }
+        return changed;
+    }
+
+    /**
+     * 文章收藏/取消收藏
+     *
+     * @param articleId  目标文章 ID
+     * @param userId     当前登录用户 ID
+     * @param isFavorite true 为收藏，false 为取消收藏
+     * @return 操作后状态是否翻转成功
+     */
+    public boolean toggleFavorite(Long articleId, Long userId, boolean isFavorite) {
+        ArticleDetailStatic staticDetail = articleCacheService.getStaticDetail(articleId);
+        if (staticDetail == null) {
+            throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND, "文章不存在或已被删除");
+        }
+
+        return counterService.toggle(
+                CounterSchema.EntityType.ARTICLE,
+                String.valueOf(articleId),
+                CounterSchema.ArticleMetric.FAVORITE,
+                userId,
+                isFavorite
+        );
     }
 
     /**

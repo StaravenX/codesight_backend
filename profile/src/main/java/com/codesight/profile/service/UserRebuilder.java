@@ -69,20 +69,33 @@ public class UserRebuilder implements CounterRebuilder {
             followingsCount = (count != null ? count : 0L);
         }
 
-        // 3. 总阅读量 + 获得总点赞量：从 articles 表汇总
+        // 3. 总阅读量 + 获得总点赞量：查出文章 ID，通过 MGET 聚合实时 16B SDS 计数
         List<Article> articles = articleMapper.selectList(
                 new LambdaQueryWrapper<Article>()
-                        .select(Article::getViewCount, Article::getLikeCount)
+                        .select(Article::getId, Article::getViewCount, Article::getLikeCount)
                         .eq(Article::getAuthorId, authorIdVal)
                         .ne(Article::getStatus, ArticleStatus.DELETED)
         );
 
         long totalViews = 0L;
         long totalLikes = 0L;
-        if (articles != null) {
+        if (articles != null && !articles.isEmpty()) {
+            List<String> articleIds = articles.stream().map(a -> String.valueOf(a.getId())).toList();
+            Map<String, Map<CounterSchema.MetricItem, Long>> realTimeCounts =
+                    counterService.batchGetCounts(CounterSchema.EntityType.ARTICLE, articleIds);
+
             for (Article article : articles) {
-                totalViews += (article.getViewCount() != null ? article.getViewCount() : 0L);
-                totalLikes += (article.getLikeCount() != null ? article.getLikeCount() : 0L);
+                Map<CounterSchema.MetricItem, Long> counts = (realTimeCounts != null)
+                        ? realTimeCounts.get(String.valueOf(article.getId()))
+                        : null;
+
+                totalViews += (counts != null && counts.containsKey(CounterSchema.ArticleMetric.VIEWS))
+                        ? counts.get(CounterSchema.ArticleMetric.VIEWS)
+                        : (article.getViewCount() != null ? article.getViewCount() : 0L);
+
+                totalLikes += (counts != null && counts.containsKey(CounterSchema.ArticleMetric.LIKE))
+                        ? counts.get(CounterSchema.ArticleMetric.LIKE)
+                        : (article.getLikeCount() != null ? article.getLikeCount() : 0L);
             }
         }
 
