@@ -61,13 +61,21 @@ public class RecommendRankConsumer {
                 redis.opsForSet().add(DIRTY_ARTICLES_KEY, String.valueOf(articleId));
             }
 
-            // 正向行为（阅读、点赞、收藏、评论）沉淀登录用户动态偏好画像
-            if (event.delta() > 0 && event.userId() > 0 && weight > 0.0) {
-                articleVectorService.recordFeedback(
-                        ArticleVectorService.FeedbackType.POSITIVE,
-                        event.userId(),
-                        articleId
-                );
+            // 正向行为（阅读、点赞、收藏、评论）增减量动态同步用户偏好画像
+            if (event.userId() > 0 && weight > 0.0) {
+                if (event.delta() > 0) {
+                    articleVectorService.recordFeedback(
+                            ArticleVectorService.FeedbackType.POSITIVE,
+                            event.userId(),
+                            articleId
+                    );
+                } else if (event.delta() < 0) {
+                    articleVectorService.removeFeedback(
+                            ArticleVectorService.FeedbackType.POSITIVE,
+                            event.userId(),
+                            articleId
+                    );
+                }
             }
 
             if (ack != null) {

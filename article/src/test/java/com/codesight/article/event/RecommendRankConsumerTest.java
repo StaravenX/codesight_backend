@@ -83,7 +83,7 @@ class RecommendRankConsumerTest {
     }
 
     @Test
-    @DisplayName("测试取消点赞反向行为：仅扣减分值，不沉淀偏好画像")
+    @DisplayName("测试取消点赞反向行为：扣减推荐分值并从正向偏好画像中移除")
     void testCancelLikeInteraction() {
         CounterEvent event = CounterEvent.of(
                 CounterSchema.EntityType.ARTICLE,
@@ -99,6 +99,28 @@ class RecommendRankConsumerTest {
         verify(recommendRankService).addOrIncrScore(1001L, -5.0);
         verify(setOperations).add(RecommendRankConsumer.DIRTY_ARTICLES_KEY, "1001");
         verify(articleVectorService, never()).recordFeedback(any(), anyLong(), anyLong());
+        verify(articleVectorService, times(1))
+                .removeFeedback(ArticleVectorService.FeedbackType.POSITIVE, 888L, 1001L);
+        verify(ack).acknowledge();
+    }
+
+    @Test
+    @DisplayName("测试取消收藏反向行为：扣减推荐分值并从正向偏好画像中移除")
+    void testCancelFavoriteInteraction() {
+        CounterEvent event = CounterEvent.of(
+                CounterSchema.EntityType.ARTICLE,
+                "1001",
+                "favorite",
+                1,
+                888L,
+                -1
+        );
+
+        consumer.onMessage(event, ack);
+
+        verify(recommendRankService).addOrIncrScore(1001L, -8.0);
+        verify(articleVectorService, times(1))
+                .removeFeedback(ArticleVectorService.FeedbackType.POSITIVE, 888L, 1001L);
         verify(ack).acknowledge();
     }
 

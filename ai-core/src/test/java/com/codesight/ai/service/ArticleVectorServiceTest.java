@@ -90,6 +90,26 @@ class ArticleVectorServiceTest {
     }
 
     @Test
+    @DisplayName("测试移除用户反馈样本：从 ZSet 移除指定文章")
+    void testRemoveFeedback_Success() {
+        when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
+
+        articleVectorService.removeFeedback(ArticleVectorService.FeedbackType.POSITIVE, 123L, 789L);
+
+        verify(zSetOperations).remove("ai:user:positive:123", "789");
+    }
+
+    @Test
+    @DisplayName("测试移除用户反馈样本：入参为空时安全忽略")
+    void testRemoveFeedback_NullParamIgnored() {
+        articleVectorService.removeFeedback(null, 123L, 789L);
+        articleVectorService.removeFeedback(ArticleVectorService.FeedbackType.POSITIVE, null, 789L);
+        articleVectorService.removeFeedback(ArticleVectorService.FeedbackType.POSITIVE, 123L, null);
+
+        verifyNoInteractions(stringRedisTemplate);
+    }
+
+    @Test
     @DisplayName("测试获取用户反馈样本向量")
     void testGetUserFeedbackVectors() {
         when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
