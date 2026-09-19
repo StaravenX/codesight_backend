@@ -62,6 +62,9 @@ public class ArticleServiceTest {
     @Mock
     private ArticleEventProducer articleEventProducer;
 
+    @Mock
+    private com.codesight.ai.service.ArticleVectorService articleVectorService;
+
     @InjectMocks
     private ArticleService articleService;
 
@@ -352,5 +355,23 @@ public class ArticleServiceTest {
         assertTrue(result);
         verify(counterService, times(1)).toggle(CounterSchema.EntityType.ARTICLE, "1001", CounterSchema.ArticleMetric.FAVORITE, 100L, true);
         verify(counterService, never()).increase(eq(CounterSchema.EntityType.USER), anyString(), any(), anyLong(), anyInt());
+    }
+
+    @Test
+    @DisplayName("测试记录文章不感兴趣负反馈")
+    void testRecordDislike_Success() {
+        articleService.recordDislike(100L, 1001L);
+
+        verify(articleVectorService, times(1))
+                .recordFeedback(com.codesight.ai.service.ArticleVectorService.FeedbackType.NEGATIVE, 100L, 1001L);
+    }
+
+    @Test
+    @DisplayName("测试记录不感兴趣参数为空时静默忽略")
+    void testRecordDislike_NullParamIgnored() {
+        articleService.recordDislike(null, 1001L);
+        articleService.recordDislike(100L, null);
+
+        verifyNoInteractions(articleVectorService);
     }
 }

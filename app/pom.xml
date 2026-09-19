@@ -69,6 +69,10 @@
         <!-- ai -->
         <dependency>
             <groupId>com.codesight</groupId>
+            <artifactId>ai-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.codesight</groupId>
             <artifactId>ai</artifactId>
         </dependency>
     </dependencies>

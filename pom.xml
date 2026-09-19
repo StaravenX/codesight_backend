@@ -26,6 +26,7 @@
         <module>article</module>
         <module>relation</module>
         <module>search</module>
+        <module>ai-core</module>
         <module>ai</module>
     </modules>
 
@@ -88,6 +89,11 @@
             <dependency>
                 <groupId>com.codesight</groupId>
                 <artifactId>search</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codesight</groupId>
+                <artifactId>ai-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

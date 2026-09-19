@@ -134,5 +134,20 @@ public class ArticleController {
             @Parameter(hidden = true) @CurrentUserId Long userId) {
         return articleService.toggleFavorite(id, userId, isFavorite);
     }
+
+    /**
+     * 标记不感兴趣（负反馈）
+     *
+     * @param id     目标文章 ID
+     * @param userId 当前登录用户 ID
+     */
+    @PostMapping("/{id}/dislike")
+    @Operation(summary = "标记不感兴趣", description = "对指定文章标记不感兴趣（负向反馈）")
+    @RateLimit(maxRequests = 60)
+    public void dislike(
+            @PathVariable("id") Long id,
+            @Parameter(hidden = true) @CurrentUserId Long userId) {
+        articleService.recordDislike(userId, id);
+    }
 }
 
