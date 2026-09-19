@@ -1,6 +1,7 @@
 package com.codesight.ai.api;
 
 import com.codesight.ai.api.dto.AiChatRequest;
+import com.codesight.ai.api.dto.RagChatRequest;
 import com.codesight.ai.api.dto.SuggestQuestionsRequest;
 import com.codesight.ai.api.dto.SuggestQuestionsResponse;
 import com.codesight.ai.service.AiChatService;
@@ -25,17 +26,24 @@ public class AiChatController {
 
     private final AiChatService aiChatService;
 
-    @RateLimit(maxRequests = 10, windowSeconds = 60)
+    @RateLimit()
     @Operation(summary = "文章问答")
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<OpenAiApi.ChatCompletionChunk> streamChat(@Valid @RequestBody AiChatRequest request) {
         return aiChatService.streamChat(request);
     }
 
-    @RateLimit(maxRequests = 20, windowSeconds = 60)
+    @RateLimit(maxRequests = 20)
     @Operation(summary = "智能技术追问推荐")
     @PostMapping("/suggest-questions")
     public SuggestQuestionsResponse suggestQuestions(@Valid @RequestBody SuggestQuestionsRequest request) {
         return aiChatService.suggestQuestions(request);
+    }
+
+    @RateLimit(maxRequests = 20)
+    @Operation(summary = "全站技术知识库 RAG 问答", description = "基于 ES 密集向量语义召回 + 大模型流式输出与引用溯源")
+    @PostMapping(value = "/rag", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<OpenAiApi.ChatCompletionChunk> streamRagChat(@Valid @RequestBody RagChatRequest request) {
+        return aiChatService.streamRagChat(request);
     }
 }

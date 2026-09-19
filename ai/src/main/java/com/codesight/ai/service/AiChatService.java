@@ -1,10 +1,13 @@
 package com.codesight.ai.service;
 
 import com.codesight.ai.api.dto.AiChatRequest;
+import com.codesight.ai.api.dto.RagChatRequest;
 import com.codesight.ai.api.dto.SuggestQuestionsRequest;
 import com.codesight.ai.api.dto.SuggestQuestionsResponse;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.common.exception.ErrorCode;
+import com.codesight.search.index.ArticleSearchDoc;
+import com.codesight.search.service.SearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -58,6 +61,8 @@ public class AiChatService {
 
     private final ChatClient chatClient;
 
+    private final SearchService searchService;
+
     /**
      * 流式问答
      */
@@ -68,32 +73,7 @@ public class AiChatService {
                 request.articleContext(),
                 "【用户提问】\n" + request.question()
         );
-        return chatClient.prompt(prompt)
-                .stream()
-                .chatResponse()
-                .map(response -> {
-                    var generation = response.getResult();
-                    String content = generation.getOutput().getText();
-                    String id = response.getMetadata().getId();
-                    String model = response.getMetadata().getModel();
-
-                    var message = new OpenAiApi.ChatCompletionMessage(content, OpenAiApi.ChatCompletionMessage.Role.ASSISTANT);
-                    var choice = new OpenAiApi.ChatCompletionChunk.ChunkChoice(null, 0, message, null);
-                    return new OpenAiApi.ChatCompletionChunk(
-                            id,
-                            List.of(choice),
-                            System.currentTimeMillis() / 1000,
-                            model,
-                            null,
-                            null,
-                            "chat.completion.chunk",
-                            null
-                    );
-                })
-                .onErrorMap(e -> {
-                    log.error("AI 流式问答异常: {}", e.getMessage(), e);
-                    return new BusinessException(ErrorCode.AI_SERVICE_ERROR);
-                });
+        return executeStreamChat(prompt, "AI 单篇伴读流式问答异常");
     }
 
     /**
@@ -182,6 +162,91 @@ public class AiChatService {
 
         userPrompt.append("请结合上述资料回答：\n").append(finalInstruction);
         messages.add(new UserMessage(userPrompt.toString()));
+        return new Prompt(messages);
+    }
+
+    /**
+     * 全站技术知识库流式问答（RAG）
+     */
+    public Flux<OpenAiApi.ChatCompletionChunk> streamRagChat(RagChatRequest request) {
+        String question = request.question().trim();
+        List<ArticleSearchDoc> relevantDocs = (searchService != null)
+                ? searchService.searchRelevantArticles(question, 3)
+                : Collections.emptyList();
+
+        Prompt prompt = buildRagPrompt(question, relevantDocs);
+        return executeStreamChat(prompt, "全站知识库 RAG 流式问答异常");
+    }
+
+    /**
+     * 统一驱动 ChatClient 进行流式对话并转换为 SSE Chunk
+     */
+    private Flux<OpenAiApi.ChatCompletionChunk> executeStreamChat(Prompt prompt, String errorLogMsg) {
+        return chatClient.prompt(prompt)
+                .stream()
+                .chatResponse()
+                .map(response -> {
+                    var generation = response.getResult();
+                    String content = generation.getOutput().getText();
+                    String id = response.getMetadata().getId();
+                    String model = response.getMetadata().getModel();
+
+                    var message = new OpenAiApi.ChatCompletionMessage(content, OpenAiApi.ChatCompletionMessage.Role.ASSISTANT);
+                    var choice = new OpenAiApi.ChatCompletionChunk.ChunkChoice(null, 0, message, null);
+                    return new OpenAiApi.ChatCompletionChunk(
+                            id,
+                            List.of(choice),
+                            System.currentTimeMillis() / 1000,
+                            model,
+                            null,
+                            null,
+                            "chat.completion.chunk",
+                            null
+                    );
+                })
+                .onErrorMap(e -> {
+                    log.error("{}: {}", errorLogMsg, e.getMessage(), e);
+                    return new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+                });
+    }
+
+    /**
+     * 动态装配 RAG 提示词
+     */
+    private Prompt buildRagPrompt(String question, List<ArticleSearchDoc> docs) {
+        StringBuilder systemContent = new StringBuilder("""
+                你是 Codesight 技术社区的全站知识库专家。请结合站内检索出的真实技术文章，客观、严谨地回答用户的问题。
+
+                回答要求：
+                1. 优先基于【站内参考文章】组织解答。若引用了某篇参考文章的具体结论或设计，请在对应解答处标明引用，如：参考自《文章标题》。
+                2. 若【站内参考文章】未涵盖问题所需内容，请基于通用计算机技术知识客观补充，并予以说明。
+                3. 代码示例必须规范，使用对应语言的代码块。
+                """);
+
+        if (docs == null || docs.isEmpty()) {
+            systemContent.append("\n【站内检索结果】：站内暂无直接收录该主题的文章，请基于专业技术经验提供权威解答，并说明站内暂未检索到直接文献。\n");
+        } else {
+            systemContent.append("\n【站内参考文章列表】：\n");
+            for (int i = 0; i < docs.size(); i++) {
+                ArticleSearchDoc doc = docs.get(i);
+                systemContent.append(String.format("### [参考文章 %d] 《%s》（文章ID: %s）\n", i + 1, doc.title(), doc.articleId()));
+                if (doc.summary() != null && !doc.summary().isBlank()) {
+                    systemContent.append("摘要：").append(doc.summary()).append("\n");
+                }
+                if (doc.body() != null && !doc.body().isBlank()) {
+                    String bodySnippet = doc.body().replaceAll("```[\\s\\S]*?```", " ").replaceAll("\\s+", " ").trim();
+                    if (bodySnippet.length() > 800) {
+                        bodySnippet = bodySnippet.substring(0, 800) + "...";
+                    }
+                    systemContent.append("核心内容节选：").append(bodySnippet).append("\n");
+                }
+                systemContent.append("\n");
+            }
+        }
+
+        List<Message> messages = new ArrayList<>();
+        messages.add(new SystemMessage(systemContent.toString()));
+        messages.add(new UserMessage("【用户提问】\n" + question));
         return new Prompt(messages);
     }
 }
