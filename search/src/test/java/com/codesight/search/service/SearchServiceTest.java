@@ -391,4 +391,33 @@ class SearchServiceTest {
         assertTrue(result.isEmpty());
         verifyNoInteractions(es);
     }
+
+    @Test
+    void testSearchRelevantArticles_Success() throws IOException {
+        String question = "Spring Boot 虚拟线程调优";
+        ArticleSearchDoc doc = ArticleSearchDoc.builder()
+                .articleId(1001L)
+                .title("Spring Boot 虚拟线程深度解析")
+                .summary("核心在于异步无阻塞调度")
+                .body("详细解析 Carrier 线程与虚拟线程调度机制...")
+                .build();
+
+        Hit<ArticleSearchDoc> mockHit = mock(Hit.class);
+        when(mockHit.source()).thenReturn(doc);
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of(mockHit));
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        List<ArticleSearchDoc> docs = searchService.searchRelevantArticles(question, 3);
+
+        assertNotNull(docs);
+        assertEquals(1, docs.size());
+        assertEquals(1001L, docs.getFirst().articleId());
+        assertEquals("Spring Boot 虚拟线程深度解析", docs.getFirst().title());
+        verify(es, times(1)).search(any(Function.class), eq(ArticleSearchDoc.class));
+    }
 }

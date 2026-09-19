@@ -349,4 +349,59 @@ public class SearchService {
         }
         return null;
     }
+
+    /**
+     * 基于 Dense Vector KNN 密集语义检索最相关的已发布文章
+     *
+     * @param question 用户提问
+     * @param limit    召回条数
+     * @return 命中的文章搜索文档列表
+     */
+    public List<ArticleSearchDoc> searchRelevantArticles(String question, int limit) {
+        if (question == null || question.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        float[] vector;
+        try {
+            vector = embeddingModel.embed(question.trim());
+        } catch (Exception e) {
+            log.warn("RAG 检索提问向量化失败: q={}, error={}", question, e.getMessage());
+            return Collections.emptyList();
+        }
+
+        if (vector.length == 0) {
+            return Collections.emptyList();
+        }
+
+        List<Float> vectorList = new ArrayList<>(vector.length);
+        for (float f : vector) {
+            vectorList.add(f);
+        }
+
+        try {
+            var resp = es.search(s -> s
+                    .index(props.getIndex())
+                    .size(limit)
+                    .knn(k -> k
+                            .field("article_vector")
+                            .queryVector(vectorList)
+                            .k(limit)
+                            .numCandidates(50)
+                            .filter(f -> f.term(t -> t.field("status").value(v -> v.stringValue("published"))))
+                    ), ArticleSearchDoc.class);
+
+            if (resp.hits() == null || resp.hits().hits() == null) {
+                return Collections.emptyList();
+            }
+
+            return resp.hits().hits().stream()
+                    .map(Hit::source)
+                    .filter(Objects::nonNull)
+                    .toList();
+        } catch (Exception e) {
+            log.error("RAG ES KNN 检索文章失败: q={}, error={}", question, e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
 }
