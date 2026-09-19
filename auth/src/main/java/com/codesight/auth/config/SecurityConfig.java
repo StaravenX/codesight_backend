@@ -2,6 +2,7 @@ package com.codesight.auth.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -55,18 +56,41 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                             .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Knife4j 和 Swagger 的静态资源与接口文档
+                // 1. Knife4j 和 Swagger 的静态资源与接口文档
                 .requestMatchers(
                     "/doc.html",
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/webjars/**",
-                    "/swagger-resources/**",
-                    "/api/v1/auth/**",
+                    "/swagger-resources/**"
+                ).permitAll()
+
+                // 2. 认证公开接口（登录、注册、发验证码、刷新Token、重置密码等）
+                .requestMatchers("/api/v1/auth/**").permitAll()
+
+                // 3. 全站技术分类与标签树公开导航
+                .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
+
+                // 4. 文章公开浏览接口（文章详情、首页/频道 Feed 流、详情页底部分割相关推荐）
+                .requestMatchers(HttpMethod.GET,
                     "/api/v1/articles/detail/**",
-                    "/api/v1/profile/authors/**"
-                )
-                .permitAll()
+                    "/api/v1/articles/feed",
+                    "/api/v1/articles/*/related",
+                    "/api/v1/search/articles/*/related"
+                ).permitAll()
+
+                // 5. 文章全局全文检索
+                .requestMatchers(HttpMethod.GET, "/api/v1/search").permitAll()
+
+                // 6. 创作者公开名片
+                .requestMatchers(HttpMethod.GET, "/api/v1/profile/authors/**").permitAll()
+
+                // 7. 用户公开关注/粉丝列表
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/relations/following",
+                    "/api/v1/relations/followers"
+                ).permitAll()
+
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt ->
                     jwt.decoder(token -> {
