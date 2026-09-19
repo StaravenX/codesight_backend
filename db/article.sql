@@ -1,3 +1,6 @@
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- 1. 一级技术分类表
 CREATE TABLE IF NOT EXISTS categories (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -123,3 +126,5 @@ INSERT INTO category_tag_rel (category_id, tag_id) VALUES
 (6, 8), -- Docker (开发工具)
 (6, 10) -- Git (开发工具)
 ON DUPLICATE KEY UPDATE category_id=VALUES(category_id);
+
+SET FOREIGN_KEY_CHECKS = 1;
