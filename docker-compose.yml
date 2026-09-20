@@ -18,7 +18,7 @@ services:
       - ./db:/docker-entrypoint-initdb.d
 
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:4.2.0
     container_name: kafka
     user: "root"
     ports:
@@ -42,7 +42,7 @@ services:
       - kafka-data:/tmp/kafka-logs
 
   redis:
-    image: redis:latest
+    image: redis:8.8.0
     container_name: redis
     ports:
       - "6379:6379"
