@@ -2,7 +2,7 @@
 
 # 码境 · CodeSight
 
-![Java 21](https://img.shields.io/badge/Java-21-F89820?logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.0-6DB33F?logo=springboot&logoColor=white) ![Spring AI](https://img.shields.io/badge/Spring_AI-1.0.9-6DB33F?logo=spring&logoColor=white) ![MyBatis-Plus](https://img.shields.io/badge/MyBatis--Plus-3.5.16-red) ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-8.8.0-DC382D?logo=redis&logoColor=white) ![Kafka](https://img.shields.io/badge/Kafka-4.2.0-231F20?logo=apachekafka&logoColor=white) ![Elasticsearch](https://img.shields.io/badge/Elasticsearch-9.2.1-005571?logo=elasticsearch&logoColor=white)
+![Java 21](https://img.shields.io/badge/Java-21-F89820?logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.0-6DB33F?logo=springboot&logoColor=white) ![Spring AI](https://img.shields.io/badge/Spring_AI-1.0.9-6DB33F?logo=spring&logoColor=white) ![MyBatis-Plus](https://img.shields.io/badge/MyBatis--Plus-3.5.16-red) ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-8.8.0-DC382D?logo=redis&logoColor=white) ![Kafka](https://img.shields.io/badge/Kafka-4.2.0-231F20?logo=apachekafka&logoColor=white) ![Elasticsearch](https://img.shields.io/badge/Elasticsearch-9.2.1-005571?logo=elasticsearch&logoColor=white) ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 
 </div>
 
@@ -20,6 +20,7 @@
 - [API 概览与接口文档](#api-概览与接口文档)
 - [数据库与存储设计](#数据库与存储设计)
 - [测试](#测试)
+- [开源协议](#开源协议)
 
 ## 项目简介
 
@@ -560,3 +561,7 @@ k6 run benchmark/k6/search_benchmark.js        # ES 全文检索
 mvn test     # 单元测试
 mvn verify   # 集成测试（failsafe）
 ```
+
+## 开源协议
+
+[Apache License 2.0](LICENSE) 
