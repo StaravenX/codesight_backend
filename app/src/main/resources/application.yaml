@@ -2,7 +2,7 @@ spring:
   application:
     name: codesight_backend
   profiles:
-    include: auth, storage, ai, search, article
+    include: auth, ai, search, article
   elasticsearch:
     uri: ${ES_URI:http://localhost:9200}
     username: ${ES_USERNAME}
@@ -29,10 +29,29 @@ spring:
   threads:
     virtual:
       enabled: true
+  ai:
+    openai:
+      base-url: ${OPENAI_BASE_URL}
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        completions-path: /chat/completions
+        options:
+          model: ${OPENAI_CHAT_MODEL}
+          temperature: 0.3
+      embedding:
+        embeddings-path: /embeddings
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL}
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+oss:
+  access-key-id: ${OSS_ACCESS_KEY_ID:}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+  region: cn-hangzhou
+  bucket: codesight
 
 app:
   cache:
