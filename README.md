@@ -31,7 +31,7 @@
 - **安全认证与权限防护**：RS256 非对称私钥签名与公钥验签解耦；基于 Access/Refresh Token 双令牌体系与 Redis 白名单，刷新时执行 `jti` 轮转作废并严防重放攻击；结合 Lua 原子防爆破与账号/IP 双维度安全锁定。
 - **三级缓存与防击穿体系**：设计通用 `MultiLevelCacheTemplate`（L1 Caffeine 8.66ms → L2 Redis 13.65ms → L3 MySQL）；通过 SingleFlight 将瞬时突发冷数据回源压缩为单次物理加载，辅以空值哨兵与 TTL 动态抖动立体防线。
 - **自研紧凑计数中台**：设计 16 字节定长 SDS 计数快照与 4KB 分片位图原子翻转判重，经 Kafka 异步削峰聚合；支持业务 SPI 锁防击穿自愈，并具备基于事件溯源的 Kafka 灾难全量历史回放能力。
-- **三种 Feed 流（推荐 / 最新 / 关注）**：全链路采用 Keyset 复合游标分页；**推荐流**构建全站 Redis ZSET Top-3000 动态候选池，串联曝光过滤与 AI 双向向量感知（余弦相似度 ≥0.85 负向语义剪枝 + 正向加权精排）；**关注流**引入**推拉结合架构**与大 V 粉丝双阈值（5500/4500）状态机平衡写放大与读延迟。
+- **三种 Feed 流（推荐 / 最新 / 关注）**：全链路复合分页；**推荐流**构建全站 Redis ZSET Top-3000 动态候选池，采用 **Session Feed Buffer 会话缓冲架构**（Redis List 预排 60 篇 + offset 切片防漏篇），串联曝光过滤与 AI 双向向量感知（余弦相似度 ≥0.85 负向语义剪枝 + 正向加权精排）；**关注流**引入**推拉结合架构**与大 V 粉丝双阈值（5500/4500）状态机平衡写放大与读延迟。
 - **混合检索与 300ms 超时熔断**：BM25 + 向量 KNN 以 RRF（k=60）融合排序，Embedding 接口注入 300ms 严格超时断路器，超时自动平滑降级纯 BM25 检索，阻断慢依赖级联雪崩。
 - **全链路 AI 问答应用**：基于 OpenAI 兼容协议构建单篇伴读流式问答（SSE）、智能追问推荐，以及全站知识库 RAG 问答（提问向量化 → ES KNN 召回 3 篇站内文档 → 带标题引用流式生成）。
 - **统一向量资产沉淀与多场景复用**：文章发布/更新时一次性特征提取生成 1536 维密集向量，经 Kafka 异步沉淀为全局向量资产（Redis 内存层 + ES 向量索引）；支撑 **4 大业务场景全局复用**：① 推荐流负向语义剪枝与正向加权精排，② 相似文章 Top-5 KNN 推荐，③ BM25+KNN 混合检索，④ 全站知识库 RAG 引用问答。
@@ -40,55 +40,23 @@
 
 ### 运行时架构
 
-```mermaid
-flowchart LR
-    client["前端 / 客户端"] -->|"HTTP REST / SSE"| app
-
-    subgraph app["CodeSight Backend · Spring Boot 单体"]
-        direction TB
-        api["接口层<br/>auth · profile · article · relation<br/>search · ai · storage"]
-        domain["领域层<br/>user · counter · ai-core"]
-        base["基础层<br/>common"]
-    end
-
-    app --> mysql[("MySQL 8.0<br/>业务数据")]
-    app --> redis[("Redis<br/>多级缓存 · 位图 · 计数 · 推荐池")]
-    app --> kafka["Kafka<br/>计数事件 · 索引同步 · 向量同步"]
-    app --> es[("Elasticsearch 9.2<br/>文章索引 + 1536 维向量")]
-    app --> oss["阿里云 OSS<br/>图片 / 文档资源"]
-    app --> llm["OpenAI 兼容大模型<br/>对话 · Embedding"]
-```
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/runtime_architecture_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/runtime_architecture_light.svg">
+    <img alt="运行时架构" src="docs/images/runtime_architecture_dark.svg" width="100%" />
+  </picture>
+</div>
 
 ### 模块依赖拓扑
 
-```mermaid
-flowchart TB
-    app["app · 启动模块<br/>聚合全部 11 个模块"]
-
-    subgraph apiLayer["接口层（提供 REST API）"]
-        auth["auth<br/>认证"] --> profile["profile<br/>个人资料"]
-        profile --> article["article<br/>文章 / 信息流"]
-        profile --> relation["relation<br/>关注关系"]
-        article --> relation
-        search["search<br/>检索"] --> article
-        ai["ai<br/>AI 应用"] --> search
-        storage["storage<br/>对象存储"]
-    end
-
-    app --> apiLayer
-
-    subgraph domainLayer["领域层（无 Controller，供上层按需复用）"]
-        user["user<br/>用户"]
-        counter["counter<br/>计数中台"]
-        aiCore["ai-core<br/>AI 基础层"]
-    end
-
-    apiLayer -.按需复用.-> domainLayer
-
-    common["common · 基础层（统一响应 / 异常 / 限流 / 多级缓存模板）"]
-    apiLayer -.-> common
-    domainLayer -.-> common
-```
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/module_topology_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/module_topology_light.svg">
+    <img alt="模块依赖拓扑" src="docs/images/module_topology_dark.svg" width="100%" />
+  </picture>
+</div>
 
 **模块间完整依赖清单**（自各模块 `pom.xml` 的 `<dependencies>` 逐一提取）：
 
@@ -286,15 +254,35 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 
 - **创作**：创建/修改文章与草稿，状态机 `draft → published → offline/deleted`；CommonMark 解析 Markdown AST，自动提炼**摘要（前 150 字）、字数、预估阅读时长（每 400 字 ≈ 1 分钟）、TOC 目录树（存 `toc_json`）**；每篇文章最多挂 5 个标签且标签必须属于所选分类；文章 ID 为雪花 ID。
 - **综合推荐流（多级漏斗体系）**：
-  - **分层候选召回**：全站默认流从 Redis ZSET `feed:recommend:pool`（Top-3000）按游标分批拉取；频道/分类/标签过滤或推荐池见底时，自动平滑下沉至 MySQL 联合索引 `(status, rank_score, id)` 游标兜底；
-  - **推荐池动态治理**：互动事件实时驱动加权（浏览 1.0 / 点赞 5.0 / 收藏 8.0 / 评论 10.0）；每 15 分钟通过 Lua 脚本原子衰减（×0.9，低于 1.0 移出）；低水位（<500）自动从 MySQL 回灌，每 60 秒将脏文章计数与 `rank_score` 批量回写 MySQL；
+
+  <div align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/feed_architecture_dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/images/feed_architecture_light.svg">
+      <img alt="推荐流多级架构与状态机" src="docs/images/feed_architecture_dark.svg" width="100%" />
+    </picture>
+  </div>
+
+  - **推荐池动态治理**：维护 Redis ZSET `feed:recommend:pool`（Top-3000）推荐池；互动事件实时驱动加权（浏览 1.0 / 点赞 5.0 / 收藏 8.0 / 评论 10.0）；每 15 分钟通过 Lua 脚本原子衰减（×0.9，低于 1.0 移出）；低水位（<500）自动从 MySQL 回灌，每 60 秒将脏文章计数与 `rank_score` 批量回写 MySQL；
+  - **用户会话 Buffer**：登录用户推荐流接入专属 Redis List 缓存队列（`feed:user:buffer:{userId}`，TTL 15 分钟），将召回精排与切片分页彻底解耦。初次加载或耗尽时，从推荐池中进行至多 8 轮拉取，经双向向量精排后批量写入 60 篇候选至 Buffer；翻页直接按 offset 内存切片读取；
   - **已读曝光过滤**：基于 Redis 维护用户滑动窗口内的已读曝光 ID 集合，推荐召回后动态剔除已读文章，保障推送新鲜度；
   - **AI 双向向量感知（负向语义剪枝 + 正向加权精排）**：
     - *负向语义剪枝*：提取用户标记不感兴趣（dislike）的负向向量，候选文章若与负向向量余弦相似度 ≥0.85，直接在召回层执行**语义剪枝**（不仅过滤单篇文章，更泛化屏蔽同类语义主题）；
     - *正向加权精排*：与用户正向互动滑动窗口向量计算相似度，按 $\text{Score} = 0.4 \times \text{SimilarityScore} + 0.6 \times \text{RankScore}$ 综合加权精排；
-  - **游标分页与并发装配**：返回结果以 `Base64("{Score}:{ArticleId}")` 编码为 Keyset 游标无偏分页；由 `ArticleFeedHydrator` 批量并发组装创作者信息、16B SDS 实时计数与位图点赞/收藏状态。
+  - **游客模式与并发装配**：未登录用户直接基于 Redis 推荐池绝对热度分值与 `rec:` Keyset 游标消费；由 `ArticleFeedHydrator` 批量并发组装创作者信息、16B SDS 实时计数与位图点赞/收藏状态。
 - **最新发布流（Keyset 游标寻址）**：适用全站或特定分类/标签下的时间序浏览；基于 MySQL 复合索引 `(status, publish_time, id)` 或 `(category_id, status, publish_time)`，利用 `publishTimeMillis + articleId` 双字段构建无偏移游标（时间相同以 ID 稳定决胜 Tie-breaker），避免深分页物理扫描与翻页过程中的数据重复/漏读漂移。
-- **社交关注流（推拉结合）**：专为关注好友与创作者场景设计。普通创作者发布走写扩散（推模式，写入粉丝收件箱）；**大 V 双阈值状态机**（粉丝 ≥5500 晋升只写发件箱走拉模式、<4500 降级回退写扩散），读取时通过 Redis Pipeline 归并收件箱与全部关注大 V 发件箱并按时间戳去重；关注/取关事务提交后异步触发收件箱回填与清理。
+- **社交关注流（推拉结合）**：
+
+  <div align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/following_feed_dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="docs/images/following_feed_light.svg">
+      <img alt="社交关注流推拉结合模型与大 V 状态机" src="docs/images/following_feed_dark.svg" width="100%" />
+    </picture>
+  </div>
+
+  - 专为关注好友与创作者场景设计。普通创作者发布走写扩散（推模式，写入粉丝收件箱）；**大 V 双阈值状态机**（粉丝 ≥5500 晋升只写发件箱走拉模式、<4500 降级回退写扩散），中间 1000 缓冲带防临界抖动；
+  - 读取时通过 Redis Pipeline 归并个人收件箱与全部关注大 V 发件箱，并按时间戳倒序归并去重；关注/取关事务提交后异步触发收件箱回填与清理。
 
 ### 关注关系（relation）
 
@@ -305,6 +293,14 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 ### 计数中台（counter）
 
 通用的互动计数组件，被 article / relation / profile 复用：
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/counter_architecture_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/counter_architecture_light.svg">
+    <img alt="计数中台高并发写入与读写闭环架构" src="docs/images/counter_architecture_dark.svg" width="100%" />
+  </picture>
+</div>
 
 - **16B SDS 计数快照**：Redis 定长 16 字节 String（4 个指标 × 4 字节大端 uint32）。文章维度：浏览/点赞/评论/收藏；用户维度：获阅读/获赞/粉丝/关注，具备可拓展性
 - **分片位图判重**：点赞/收藏/关注按 `userId/32768` 分片存储位图（每片 4KB），`lua/toggle_bit.lua` 原子翻转，状态真实变化才产生计数事件。
@@ -539,6 +535,8 @@ k6 run benchmark/k6/search_benchmark.js        # ES 全文检索
 | 点赞/收藏/关注判重                   | 分片 Bitmap `bm:{entityType}:{entityId}:{metric}:{chunk}`（每片 32768 位） |
 | 文章/分类/用户画像缓存               | String（Caffeine + Redis 两级）                                            |
 | 推荐排序池                           | ZSET `feed:recommend:pool`（Top-3000）                                     |
+| 推荐流会话缓存队列（Buffer）         | List `feed:user:buffer:{userId}`（预排 60 篇，TTL 15m，offset 切片）       |
+| 推荐流已读曝光滑动窗口               | ZSET `feed:user:exposed:{userId}`（容量 100 篇，TTL 30d）                  |
 | 关注流收件箱 / 发件箱                | ZSET `feed:inbox:{userId}` / `feed:outbox:{authorId}`                      |
 | 文章向量 / 用户偏好画像              | String / ZSET（`ai:article:vector:*`、`ai:user:positive:*` 等）            |
 | Refresh Token 白名单 / 验证码 / 限流 | String / Hash（`auth:refresh_token:*`、`auth:code:*`、`rate_limit:ip:*`）  |

@@ -14,6 +14,7 @@ import com.codesight.article.model.entity.Article;
 import com.codesight.article.model.enums.ArticleStatus;
 import com.codesight.article.model.enums.ArticleVisible;
 import com.codesight.article.model.enums.FeedSortType;
+import com.codesight.article.util.FeedCursorUtils;
 import com.codesight.common.exception.BusinessException;
 import com.codesight.counter.schema.CounterSchema;
 import com.codesight.counter.service.CounterService;
@@ -33,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.DefaultTypedTuple;
+import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.SetOperations;
@@ -97,6 +99,9 @@ class ArticleFeedServiceTest {
     private SetOperations<String, String> setOperations;
 
     @Mock
+    private ListOperations<String, String> listOperations;
+
+    @Mock
     private ArticleRecommendVectorService articleRecommendVectorService;
 
     private final FeedProperties feedProperties = new FeedProperties();
@@ -105,8 +110,46 @@ class ArticleFeedServiceTest {
 
     @BeforeEach
     void setUp() {
+        Map<String, List<String>> redisListStorage = new HashMap<>();
+
         when(stringRedisTemplate.opsForZSet()).thenReturn(zSetOperations);
         when(stringRedisTemplate.opsForSet()).thenReturn(setOperations);
+        when(stringRedisTemplate.opsForList()).thenReturn(listOperations);
+
+        doAnswer(inv -> {
+            String key = inv.getArgument(0);
+            Collection<String> values = inv.getArgument(1);
+            redisListStorage.computeIfAbsent(key, k -> new ArrayList<>()).addAll(values);
+            return (long) redisListStorage.get(key).size();
+        }).when(listOperations).rightPushAll(anyString(), anyCollection());
+
+        when(listOperations.range(anyString(), anyLong(), anyLong())).thenAnswer(inv -> {
+            String key = inv.getArgument(0);
+            long start = inv.getArgument(1);
+            long end = inv.getArgument(2);
+            List<String> list = redisListStorage.get(key);
+            if (list == null || list.isEmpty() || start >= list.size()) {
+                return Collections.emptyList();
+            }
+            int fromIndex = (int) Math.max(0, start);
+            int toIndex = (int) Math.min(list.size(), end + 1);
+            if (fromIndex >= toIndex) {
+                return Collections.emptyList();
+            }
+            return new ArrayList<>(list.subList(fromIndex, toIndex));
+        });
+
+        when(listOperations.size(anyString())).thenAnswer(inv -> {
+            String key = inv.getArgument(0);
+            List<String> list = redisListStorage.get(key);
+            return list != null ? (long) list.size() : 0L;
+        });
+
+        when(stringRedisTemplate.delete(anyString())).thenAnswer(inv -> {
+            String key = inv.getArgument(0);
+            return redisListStorage.remove(key) != null;
+        });
+
         when(zSetOperations.score(anyString(), anyString())).thenReturn(null);
         when(stringRedisTemplate.executePipelined(any(SessionCallback.class)))
                 .thenAnswer(inv -> {
@@ -262,7 +305,7 @@ class ArticleFeedServiceTest {
 
         when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(21)))
                 .thenReturn(Collections.emptyList());
-        when(articleMapper.selectFeedRecommended(isNull(), isNull(), isNull(), any(Instant.class), isNull(), isNull(), eq(21)))
+        when(articleMapper.selectFeedRecommended(isNull(), isNull(), isNull(), any(Instant.class), isNull(), isNull(), anyInt()))
                 .thenReturn(mockList);
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
@@ -346,7 +389,7 @@ class ArticleFeedServiceTest {
         Article a4 = createArticle(4L, 200L, 1L, now, 90L, 9L);
         Article a5 = createArticle(5L, 200L, 1L, now, 80L, 8L);
 
-        when(articleMapper.selectByIds(eq(List.of(2L, 4L, 5L))))
+        when(articleMapper.selectByIds(anyList()))
                 .thenReturn(List.of(a2, a4, a5));
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
@@ -364,11 +407,9 @@ class ArticleFeedServiceTest {
         assertEquals(2L, response.items().get(0).getId());
         assertEquals(4L, response.items().get(1).getId());
 
-        // 验证 nextCursor 指向第 2 条文章 (4L)
+        // 验证 nextCursor 为下一个 offset（Base64 编码）
         assertNotNull(response.nextCursor());
-        String decodedCursor = new String(Base64.getUrlDecoder().decode(response.nextCursor()), StandardCharsets.UTF_8);
-        assertTrue(decodedCursor.startsWith("rec:"));
-        assertTrue(decodedCursor.contains(":4"));
+        assertEquals(FeedCursorUtils.buildBufferCursor(2), response.nextCursor());
     }
 
     @Test
@@ -377,7 +418,7 @@ class ArticleFeedServiceTest {
         Long userId = 999L;
         Instant now = Instant.now();
 
-        // 构造满 fetchLimit(25) 的推荐池候选
+        // 构造满 fetchLimit 的推荐池候选
         List<TypedTuple<String>> tuples = new ArrayList<>();
         for (int i = 1; i <= 25; i++) {
             tuples.add(new DefaultTypedTuple<>(String.valueOf(i), 100.0 - i));
@@ -394,7 +435,7 @@ class ArticleFeedServiceTest {
 
         Article a24 = createArticle(24L, 200L, 1L, now, 100L, 10L);
         Article a25 = createArticle(25L, 200L, 1L, now, 90L, 9L);
-        when(articleMapper.selectByIds(eq(List.of(24L, 25L)))).thenReturn(List.of(a24, a25));
+        when(articleMapper.selectByIds(anyList())).thenReturn(List.of(a24, a25));
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
                 .size(2)
@@ -405,11 +446,10 @@ class ArticleFeedServiceTest {
 
         assertNotNull(response);
         assertEquals(2, response.items().size());
-        // 虽然过滤后条数恰好为 2 (不大于 size)，但因为 Redis 查满了 fetchLimit，判定仍有下一页
+        // 过滤后条数恰好为 2 (等于页大小)，判定仍有下一页
         assertTrue(response.hasMore());
         assertNotNull(response.nextCursor());
-        String decodedCursor = new String(Base64.getUrlDecoder().decode(response.nextCursor()), StandardCharsets.UTF_8);
-        assertTrue(decodedCursor.contains(":25"));
+        assertEquals(FeedCursorUtils.buildBufferCursor(2), response.nextCursor());
     }
 
     @Test
@@ -418,32 +458,33 @@ class ArticleFeedServiceTest {
         Long userId = 999L;
         Instant now = Instant.now();
 
-        // 第 1 轮候选集 1~25 号
+        // 第 1 轮候选集 1~80 号（查满单批 80 条）
         List<TypedTuple<String>> round1 = new ArrayList<>();
-        for (int i = 1; i <= 25; i++) {
-            round1.add(new DefaultTypedTuple<>(String.valueOf(i), 100.0 - i));
+        for (long i = 1; i <= 80; i++) {
+            round1.add(new DefaultTypedTuple<>(String.valueOf(i), 100.0 - i * 0.2));
         }
+        round1.set(79, new DefaultTypedTuple<>("80", 75.0));
 
-        // 第 2 轮候选集 26~50 号
+        // 第 2 轮候选集 81~160 号
         List<TypedTuple<String>> round2 = new ArrayList<>();
-        for (int i = 26; i <= 50; i++) {
-            round2.add(new DefaultTypedTuple<>(String.valueOf(i), 70.0 - (i - 25)));
+        for (long i = 81; i <= 160; i++) {
+            round2.add(new DefaultTypedTuple<>(String.valueOf(i), 70.0 - (i - 80) * 0.2));
         }
 
-        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt()))
+        when(recommendRankService.getRankedArticleIds(isNull(), isNull(), eq(80)))
                 .thenReturn(round1);
-        when(recommendRankService.getRankedArticleIds(eq(75.0), eq(25L), anyInt()))
+        when(recommendRankService.getRankedArticleIds(eq(75.0), eq(80L), eq(80)))
                 .thenReturn(round2);
 
-        // 模拟高密度曝光：第 1 轮 1~20 号（共 20 篇）全部曝光，21~25（仅 5 篇）未曝光
+        // 模拟高密度曝光：第 1 轮 1~75 号全部曝光，76~80（仅 5 篇）未曝光
         String exposedKey = FeedRedisKeys.getExposedKey(userId);
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= 75; i++) {
             when(zSetOperations.score(eq(exposedKey), eq(String.valueOf(i)))).thenReturn(1000.0);
         }
 
         // mock 查询数据库：为两轮未曝光文章构造实体
         List<Article> articles = new ArrayList<>();
-        for (long id = 21; id <= 50; id++) {
+        for (long id = 76; id <= 160; id++) {
             articles.add(createArticle(id, 200L, 1L, now, 100L - id, 10L));
         }
         when(articleMapper.selectByIds(anyList())).thenReturn(articles);
@@ -459,11 +500,11 @@ class ArticleFeedServiceTest {
         // 验证通过第二轮补拉，成功凑满了请求的整页 10 条数据，杜绝了残缺半页
         assertEquals(10, response.items().size());
         assertTrue(response.hasMore());
-        assertEquals(21L, response.items().get(0).getId());
-        assertEquals(30L, response.items().get(9).getId());
+        assertEquals(76L, response.items().get(0).getId());
+        assertEquals(85L, response.items().get(9).getId());
 
         // 验证确实发起了第二轮受控补拉
-        verify(recommendRankService, times(1)).getRankedArticleIds(eq(75.0), eq(25L), anyInt());
+        verify(recommendRankService, times(1)).getRankedArticleIds(eq(75.0), eq(80L), eq(80));
     }
 
     @Test
@@ -514,7 +555,7 @@ class ArticleFeedServiceTest {
 
         // 兜底 MySQL 返回未曝光文章
         Article mysqlArticle = createArticle(200L, 300L, 1L, now, 60L, 5L);
-        when(articleMapper.selectFeedRecommended(isNull(), isNull(), isNull(), any(Instant.class), isNull(), isNull(), eq(2)))
+        when(articleMapper.selectFeedRecommended(isNull(), isNull(), isNull(), any(Instant.class), isNull(), isNull(), anyInt()))
                 .thenReturn(List.of(mysqlArticle));
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
@@ -528,7 +569,6 @@ class ArticleFeedServiceTest {
         assertEquals(1, response.items().size());
         assertEquals(200L, response.items().getFirst().getId());
     }
-
 
     @Test
     @DisplayName("测试登录用户点赞状态水合：Pipeline 批量判定 isLiked 为 true")
@@ -813,7 +853,7 @@ class ArticleFeedServiceTest {
                 new DefaultTypedTuple<>("102", 900.0)
         );
         when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt())).thenReturn(tuples);
-        when(articleMapper.selectByIds(List.of(101L, 102L))).thenReturn(List.of(a1, a2));
+        when(articleMapper.selectByIds(anyList())).thenReturn(List.of(a1, a2));
  
         // 模拟 AI 模块精排：用户画像与 a2 契合度极高，重排为 [a2, a1]
         Long currentUserId = 888L;
@@ -843,7 +883,7 @@ class ArticleFeedServiceTest {
                 new DefaultTypedTuple<>("202", 950.0)
         );
         when(recommendRankService.getRankedArticleIds(isNull(), isNull(), anyInt())).thenReturn(tuples);
-        when(articleMapper.selectByIds(List.of(201L, 202L))).thenReturn(List.of(cleanArticle, softArticle));
+        when(articleMapper.selectByIds(anyList())).thenReturn(List.of(cleanArticle, softArticle));
 
         // 模拟 AI 模块负向语义剪枝：剔除 202 同质营销软文，仅保留 201
         Long currentUserId = 888L;

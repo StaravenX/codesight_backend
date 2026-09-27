@@ -4,5 +4,9 @@ codesight:
     big-v-demotion-threshold: 4500
     inbox-max-capacity: 200
     outbox-max-capacity: 100
-    exposed-max-capacity: 1000
+    exposed-max-capacity: 100
     exposed-ttl: 24h
+    buffer-batch-size: 60
+    buffer-max-rounds: 4
+    buffer-fetch-limit: 80
+    buffer-ttl: 15m

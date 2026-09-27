@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 590" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+
+    <filter id="shadowLight" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+
+    <marker id="arLight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#64748b" />
+    </marker>
+    <marker id="arBlueLight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#2563eb" />
+    </marker>
+  </defs>
+
+  <style>
+    .title-main { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; font-weight: 700; fill: #0f172a; text-anchor: middle; }
+    .title-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; fill: #475569; text-anchor: middle; }
+    .node-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 700; fill: #1e293b; text-anchor: middle; }
+    .node-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10.5px; fill: #64748b; text-anchor: middle; }
+    .edge-text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10.5px; font-weight: 500; fill: #4338ca; text-anchor: middle; }
+    .edge-bg { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; rx: 4px; }
+    .line-solid { fill: none; stroke: #94a3b8; stroke-width: 1.5; stroke-linejoin: round; }
+    .line-dash { fill: none; stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; stroke-linejoin: round; }
+    .line-blue { fill: none; stroke: #2563eb; stroke-width: 1.6; stroke-linejoin: round; }
+  </style>
+
+  <rect width="960" height="590" rx="14" fill="url(#bgGradLight)" stroke="#e2e8f0" stroke-width="1.5" />
+
+  <g transform="translate(340, 22)" filter="url(#shadowLight)">
+    <rect width="280" height="52" rx="10" fill="#ffffff" stroke="#2563eb" stroke-width="1.5" />
+    <circle cx="24" cy="26" r="4.5" fill="#2563eb" />
+    <text x="145" y="24" class="title-main" fill="#1d4ed8">app · 启动模块</text>
+    <text x="145" y="42" class="title-sub">聚合全部 11 个模块</text>
+  </g>
+
+  <path d="M 480 74 L 480 104" class="line-blue" marker-end="url(#arBlueLight)" />
+
+  <g transform="translate(35, 104)" filter="url(#shadowLight)">
+    <rect width="890" height="210" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.3" />
+    <text x="445" y="26" class="title-main" fill="#0f172a">接口层（提供 REST API）</text>
+
+    <g transform="translate(30, 44)">
+      <rect width="115" height="52" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.2" />
+      <text x="57" y="23" class="node-title" fill="#3730a3">auth</text>
+      <text x="57" y="40" class="node-sub">认证</text>
+    </g>
+
+    <g transform="translate(195, 44)">
+      <rect width="125" height="52" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.2" />
+      <text x="62" y="23" class="node-title" fill="#3730a3">profile</text>
+      <text x="62" y="40" class="node-sub">个人资料</text>
+    </g>
+
+    <g transform="translate(370, 44)">
+      <rect width="150" height="52" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.2" />
+      <text x="75" y="23" class="node-title" fill="#3730a3">article</text>
+      <text x="75" y="40" class="node-sub">文章 / 信息流</text>
+    </g>
+
+    <g transform="translate(570, 44)">
+      <rect width="125" height="52" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.2" />
+      <text x="62" y="23" class="node-title" fill="#3730a3">search</text>
+      <text x="62" y="40" class="node-sub">检索</text>
+    </g>
+
+    <g transform="translate(745, 44)">
+      <rect width="115" height="52" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.2" />
+      <text x="57" y="23" class="node-title" fill="#3730a3">ai</text>
+      <text x="57" y="40" class="node-sub">AI 应用</text>
+    </g>
+
+    <g transform="translate(285, 138)">
+      <rect width="140" height="52" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.2" />
+      <text x="70" y="23" class="node-title" fill="#3730a3">relation</text>
+      <text x="70" y="40" class="node-sub">关注关系</text>
+    </g>
+
+    <g transform="translate(525, 138)">
+      <rect width="140" height="52" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.2" />
+      <text x="70" y="23" class="node-title" fill="#334155">storage</text>
+      <text x="70" y="40" class="node-sub">对象存储</text>
+    </g>
+
+    <path d="M 145 70 L 195 70" class="line-solid" marker-end="url(#arLight)" />
+    <path d="M 320 70 L 370 70" class="line-solid" marker-end="url(#arLight)" />
+    <path d="M 257 96 L 257 164 L 285 164" class="line-solid" marker-end="url(#arLight)" />
+    <path d="M 380 96 L 380 138" class="line-solid" marker-end="url(#arLight)" />
+    <path d="M 570 70 L 520 70" class="line-solid" marker-end="url(#arLight)" />
+    <path d="M 745 70 L 695 70" class="line-solid" marker-end="url(#arLight)" />
+  </g>
+
+  <path d="M 480 314 L 480 354" class="line-dash" marker-end="url(#arLight)" />
+  <g transform="translate(480, 334)">
+    <rect x="-35" y="-8" width="70" height="16" class="edge-bg" />
+    <text class="edge-text" y="4">按需复用</text>
+  </g>
+
+  <g transform="translate(100, 354)" filter="url(#shadowLight)">
+    <rect width="760" height="108" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.3" />
+    <text x="380" y="25" class="title-main" fill="#0f172a">领域层（无 Controller，供上层按需复用）</text>
+
+    <g transform="translate(40, 42)">
+      <rect width="190" height="50" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2" />
+      <text x="95" y="22" class="node-title" fill="#5b21b6">user</text>
+      <text x="95" y="39" class="node-sub">用户</text>
+    </g>
+
+    <g transform="translate(285, 42)">
+      <rect width="190" height="50" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2" />
+      <text x="95" y="22" class="node-title" fill="#5b21b6">counter</text>
+      <text x="95" y="39" class="node-sub">计数中台</text>
+    </g>
+
+    <g transform="translate(530, 42)">
+      <rect width="190" height="50" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2" />
+      <text x="95" y="22" class="node-title" fill="#5b21b6">ai-core</text>
+      <text x="95" y="39" class="node-sub">AI 基础层</text>
+    </g>
+  </g>
+
+  <path d="M 480 462 L 480 502" class="line-dash" marker-end="url(#arLight)" />
+
+  <path d="M 65 314 L 65 528 L 100 528" class="line-dash" marker-end="url(#arLight)" />
+
+  <g transform="translate(100, 502)" filter="url(#shadowLight)">
+    <rect width="760" height="54" rx="10" fill="#ffffff" stroke="#64748b" stroke-width="1.3" />
+    <circle cx="28" cy="27" r="4.5" fill="#64748b" />
+    <text x="390" y="33" class="title-main" fill="#1e293b">common · 基础层（统一响应 / 异常 / 限流 / 多级缓存模板）</text>
+  </g>
+</svg>

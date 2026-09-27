@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+
+    <filter id="shadowLight" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+
+    <marker id="arLight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#64748b" />
+    </marker>
+    <marker id="arBlueLight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#2563eb" />
+    </marker>
+  </defs>
+
+  <style>
+    .txt-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; font-weight: 700; fill: #0f172a; text-anchor: middle; }
+    .txt-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; fill: #475569; text-anchor: middle; }
+    .txt-edge { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #0284c7; text-anchor: middle; }
+    .edge-box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; rx: 4px; }
+    .line-neutral { fill: none; stroke: #94a3b8; stroke-width: 1.5; stroke-linejoin: round; }
+    .line-blue { fill: none; stroke: #2563eb; stroke-width: 1.6; stroke-linejoin: round; }
+  </style>
+
+  <rect width="960" height="480" rx="14" fill="url(#bgGradLight)" stroke="#e2e8f0" stroke-width="1.5" />
+
+  <g transform="translate(25, 200)" filter="url(#shadowLight)">
+    <rect width="135" height="72" rx="10" fill="#ffffff" stroke="#2563eb" stroke-width="1.5" />
+    <circle cx="22" cy="36" r="4.5" fill="#2563eb" />
+    <text x="77" y="41" class="txt-title" fill="#1d4ed8">前端 / 客户端</text>
+  </g>
+
+  <path d="M 160 236 L 280 236" class="line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(220, 226)">
+    <rect x="-52" y="-8" width="104" height="16" class="edge-box" />
+    <text class="txt-edge" y="4">HTTP REST / SSE</text>
+  </g>
+
+  <g transform="translate(280, 24)" filter="url(#shadowLight)">
+    <rect width="300" height="432" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+    <text x="150" y="32" class="txt-title" fill="#0f172a">CodeSight Backend · Spring Boot 单体</text>
+    <line x1="20" y1="46" x2="280" y2="46" stroke="#e2e8f0" stroke-width="1" />
+
+    <g transform="translate(18, 56)">
+      <rect width="264" height="86" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.3" />
+      <text x="132" y="26" class="txt-title" fill="#3730a3">接口层</text>
+      <text x="132" y="50" class="txt-sub">auth · profile · article · relation</text>
+      <text x="132" y="68" class="txt-sub">search · ai · storage</text>
+    </g>
+
+    <path d="M 150 142 L 150 168" class="line-neutral" marker-end="url(#arLight)" />
+
+    <g transform="translate(18, 168)">
+      <rect width="264" height="74" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.3" />
+      <text x="132" y="28" class="txt-title" fill="#5b21b6">领域层</text>
+      <text x="132" y="52" class="txt-sub">user · counter · ai-core</text>
+    </g>
+
+    <path d="M 150 242 L 150 268" class="line-neutral" marker-end="url(#arLight)" />
+
+    <g transform="translate(18, 268)">
+      <rect width="264" height="68" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.3" />
+      <text x="132" y="28" class="txt-title" fill="#334155">基础层</text>
+      <text x="132" y="50" class="txt-sub">common</text>
+    </g>
+  </g>
+
+  <path d="M 580 240 L 615 240" class="line-neutral" />
+  <path d="M 615 54 L 615 424" class="line-neutral" />
+  <path d="M 615 54 L 650 54" class="line-neutral" marker-end="url(#arLight)" />
+  <path d="M 615 128 L 650 128" class="line-neutral" marker-end="url(#arLight)" />
+  <path d="M 615 202 L 650 202" class="line-neutral" marker-end="url(#arLight)" />
+  <path d="M 615 276 L 650 276" class="line-neutral" marker-end="url(#arLight)" />
+  <path d="M 615 350 L 650 350" class="line-neutral" marker-end="url(#arLight)" />
+  <path d="M 615 424 L 650 424" class="line-neutral" marker-end="url(#arLight)" />
+
+  <g transform="translate(650, 25)" filter="url(#shadowLight)">
+    <rect width="285" height="58" rx="8" fill="#ffffff" stroke="#0284c7" stroke-width="1.2" />
+    <circle cx="22" cy="29" r="4.5" fill="#0284c7" />
+    <text x="150" y="26" class="txt-title" fill="#0369a1">MySQL 8.0</text>
+    <text x="150" y="45" class="txt-sub">业务数据</text>
+  </g>
+
+  <g transform="translate(650, 99)" filter="url(#shadowLight)">
+    <rect width="285" height="58" rx="8" fill="#ffffff" stroke="#ef4444" stroke-width="1.2" />
+    <circle cx="22" cy="29" r="4.5" fill="#ef4444" />
+    <text x="150" y="26" class="txt-title" fill="#dc2626">Redis</text>
+    <text x="150" y="45" class="txt-sub">多级缓存 · 位图 · 计数 · 推荐池</text>
+  </g>
+
+  <g transform="translate(650, 173)" filter="url(#shadowLight)">
+    <rect width="285" height="58" rx="8" fill="#ffffff" stroke="#f97316" stroke-width="1.2" />
+    <circle cx="22" cy="29" r="4.5" fill="#f97316" />
+    <text x="150" y="26" class="txt-title" fill="#ea580c">Kafka</text>
+    <text x="150" y="45" class="txt-sub">计数事件 · 索引同步 · 向量同步</text>
+  </g>
+
+  <g transform="translate(650, 247)" filter="url(#shadowLight)">
+    <rect width="285" height="58" rx="8" fill="#ffffff" stroke="#10b981" stroke-width="1.2" />
+    <circle cx="22" cy="29" r="4.5" fill="#10b981" />
+    <text x="150" y="26" class="txt-title" fill="#059669">Elasticsearch 9.2</text>
+    <text x="150" y="45" class="txt-sub">文章索引 + 1536 维向量</text>
+  </g>
+
+  <g transform="translate(650, 321)" filter="url(#shadowLight)">
+    <rect width="285" height="58" rx="8" fill="#ffffff" stroke="#d97706" stroke-width="1.2" />
+    <circle cx="22" cy="29" r="4.5" fill="#d97706" />
+    <text x="150" y="26" class="txt-title" fill="#b45309">阿里云 OSS</text>
+    <text x="150" y="45" class="txt-sub">图片 / 文档资源</text>
+  </g>
+
+  <g transform="translate(650, 395)" filter="url(#shadowLight)">
+    <rect width="285" height="58" rx="8" fill="#ffffff" stroke="#8b5cf6" stroke-width="1.2" />
+    <circle cx="22" cy="29" r="4.5" fill="#8b5cf6" />
+    <text x="150" y="26" class="txt-title" fill="#6d28d9">OpenAI 兼容大模型</text>
+    <text x="150" y="45" class="txt-sub">对话 · Embedding</text>
+  </g>
+</svg>

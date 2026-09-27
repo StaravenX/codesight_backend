@@ -1,7 +1,5 @@
-package com.codesight.article.service;
+package com.codesight.article.util;
 
-import com.codesight.common.exception.BusinessException;
-import com.codesight.common.exception.ErrorCode;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
@@ -17,6 +15,7 @@ public class FeedCursorUtils {
 
     public static final String CURSOR_PREFIX_RECOMMENDED = "rec";
     public static final String CURSOR_PREFIX_NEWEST = "new";
+    public static final String CURSOR_PREFIX_BUFFER = "buf";
 
     public record FeedCursor(long value, long articleId) {}
 
@@ -27,6 +26,11 @@ public class FeedCursorUtils {
         if (cursorStr == null || cursorStr.isBlank()) {
             return null;
         }
+
+        if (cursorStr.chars().allMatch(Character::isDigit)) {
+            return null;
+        }
+
         try {
             String decoded = new String(Base64.getUrlDecoder().decode(cursorStr), StandardCharsets.UTF_8);
             if (decoded.startsWith(prefix + ":")) {
@@ -35,9 +39,8 @@ public class FeedCursorUtils {
                 if (parts.length >= 2) {
                     return new FeedCursor(Long.parseLong(parts[0]), Long.parseLong(parts[1]));
                 }
-            } else {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "游标前缀格式错误");
             }
+        } catch (IllegalArgumentException ignored) {
         } catch (Exception e) {
             log.warn("解析游标失败，cursorStr: {}, prefix: {}", cursorStr, prefix, e);
         }
@@ -50,5 +53,34 @@ public class FeedCursorUtils {
     public static String buildCursor(String prefix, long value, long articleId) {
         String raw = prefix + ":" + value + ":" + articleId;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 构建 Buffer 游标（Base64 URL 编码）
+     */
+    public static String buildBufferCursor(int offset) {
+        String raw = CURSOR_PREFIX_BUFFER + ":" + offset;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 解析 Buffer 游标，获取 offset（兼容纯数字）
+     */
+    public static int parseBufferCursor(String cursorStr) {
+        if (cursorStr == null || cursorStr.isBlank()) {
+            return 0;
+        }
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(cursorStr), StandardCharsets.UTF_8);
+            if (decoded.startsWith(CURSOR_PREFIX_BUFFER + ":")) {
+                return Integer.parseInt(decoded.substring(CURSOR_PREFIX_BUFFER.length() + 1));
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            return Integer.parseInt(cursorStr.trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 }

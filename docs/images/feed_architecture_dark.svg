@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+    
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <filter id="boxShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#60a5fa" />
+    </marker>
+    <marker id="arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#818cf8" />
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#fbbf24" />
+    </marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#34d399" />
+    </marker>
+  </defs>
+
+  <style>
+    .label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #f1f5f9; text-anchor: middle; }
+    .sublabel { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; fill: #94a3b8; text-anchor: middle; }
+    .edge-text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #cbd5e1; text-anchor: middle; }
+    .edge-bg { fill: #1e293b; stroke: #334155; stroke-width: 1; rx: 4px; }
+    .lane-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 700; text-anchor: middle; }
+    .lane-desc { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px; text-anchor: middle; }
+    .flow-line { fill: none; stroke: #64748b; stroke-width: 1.6; stroke-linejoin: round; }
+    .flow-line-blue { fill: none; stroke: #3b82f6; stroke-width: 1.6; stroke-linejoin: round; }
+    .flow-line-indigo { fill: none; stroke: #6366f1; stroke-width: 1.6; stroke-linejoin: round; }
+    .flow-line-amber { fill: none; stroke: #f59e0b; stroke-width: 1.6; stroke-linejoin: round; }
+    .flow-line-emerald { fill: none; stroke: #10b981; stroke-width: 1.6; stroke-linejoin: round; }
+  </style>
+
+  <rect width="960" height="640" rx="14" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="1.5" />
+
+  
+  <g transform="translate(25, 298)">
+    <rect width="115" height="66" rx="8" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.2" filter="url(#boxShadow)" />
+    <circle cx="22" cy="24" r="5" fill="#818cf8" />
+    <text x="65" y="28" class="lane-title" fill="#e0e7ff">Buffer 层</text>
+    <text x="58" y="48" class="lane-desc" fill="#a5b4fc">Redis List · 会话缓冲</text>
+  </g>
+
+  <g transform="translate(25, 412)">
+    <rect width="115" height="66" rx="8" fill="#451a03" stroke="#f59e0b" stroke-width="1.2" filter="url(#boxShadow)" />
+    <circle cx="22" cy="24" r="5" fill="#fbbf24" />
+    <text x="65" y="28" class="lane-title" fill="#fef3c7">Redis 推荐池</text>
+    <text x="58" y="48" class="lane-desc" fill="#fde68a">ZSet · Top-3000</text>
+  </g>
+
+  <g transform="translate(25, 532)">
+    <rect width="115" height="66" rx="8" fill="#022c22" stroke="#10b981" stroke-width="1.2" filter="url(#boxShadow)" />
+    <circle cx="22" cy="24" r="5" fill="#34d399" />
+    <text x="65" y="28" class="lane-title" fill="#d1fae5">MySQL 层</text>
+    <text x="58" y="48" class="lane-desc" fill="#a7f3d0">全量库 · 频道与保底</text>
+  </g>
+
+  <g transform="translate(390, 30)" filter="url(#boxShadow)">
+    <rect width="260" height="40" rx="20" fill="url(#cardGrad)" stroke="#3b82f6" stroke-width="1.5" />
+    <text x="130" y="25" class="label" fill="#60a5fa">发起推荐请求 GET /articles/feed</text>
+  </g>
+
+  <path d="M 520 70 L 520 100" class="flow-line-blue" marker-end="url(#arrow-blue)" />
+
+  <g transform="translate(520, 130)" filter="url(#boxShadow)">
+    <polygon points="0,-30 115,0 0,30 -115,0" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
+    <text x="0" y="-4" class="label" font-size="12">是否默认推荐流？</text>
+    <text x="0" y="13" class="sublabel" font-size="10">(无分类/标签)</text>
+  </g>
+
+  <path d="M 520 160 L 520 200" class="flow-line" marker-end="url(#arrow)" />
+  <g transform="translate(520, 179)">
+    <rect x="-14" y="-8" width="28" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#38bdf8">是</text>
+  </g>
+
+  <path d="M 635 130 L 860 130 L 860 532" class="flow-line-emerald" marker-end="url(#arrow-emerald)" />
+  <g transform="translate(748, 120)">
+    <rect x="-56" y="-8" width="112" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#f87171">否 (分类/标签频道)</text>
+  </g>
+
+  <g transform="translate(520, 226)" filter="url(#boxShadow)">
+    <polygon points="0,-26 95,0 0,26 -95,0" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
+    <text x="0" y="4" class="label" font-size="12">是否已登录？</text>
+  </g>
+
+  
+  <path d="M 615 226 L 710 226 L 710 412" class="flow-line-amber" marker-end="url(#arrow-amber)" />
+  <g transform="translate(662, 216)">
+    <rect x="-24" y="-8" width="48" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#fde047">未登录</text>
+  </g>
+
+  <g transform="translate(605, 412)" filter="url(#boxShadow)">
+    <rect width="210" height="72" rx="10" fill="url(#cardGrad)" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="105" y="28" class="label" fill="#fef3c7">切片获取推荐池文章</text>
+    <text x="105" y="49" class="sublabel" fill="#fbbf24">消费 ZSet · 下发 rec: 游标</text>
+  </g>
+
+  <path d="M 710 484 L 710 532" class="flow-line-emerald" marker-end="url(#arrow-emerald)" />
+  <g transform="translate(710, 506)">
+    <rect x="-35" y="-8" width="70" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#cbd5e1">推荐池翻穿</text>
+  </g>
+
+  <path d="M 425 226 L 340 226 L 340 298" class="flow-line-indigo" marker-end="url(#arrow-indigo)" />
+  <g transform="translate(382, 216)">
+    <rect x="-24" y="-8" width="48" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#a5b4fc">已登录</text>
+  </g>
+
+  <path d="M 240 331 L 185 331 L 185 532" class="flow-line-emerald" marker-end="url(#arrow-emerald)" />
+  <g transform="translate(185, 386)">
+    <rect x="-36" y="-8" width="72" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#34d399">rec: 游标</text>
+  </g>
+  <text x="185" y="407" class="sublabel" font-size="9" fill="#94a3b8">(兜底分流)</text>
+
+  <g transform="translate(240, 298)" filter="url(#boxShadow)">
+    <rect width="200" height="66" rx="10" fill="url(#cardGrad)" stroke="#6366f1" stroke-width="1.5" />
+    <text x="100" y="27" class="label" fill="#e0e7ff">消费 Buffer 切片返回</text>
+    <text x="100" y="47" class="sublabel" fill="#a5b4fc">LRANGE 切片 · 下发 buf: 游标</text>
+  </g>
+
+  <path d="M 340 364 L 340 412" class="flow-line-amber" marker-end="url(#arrow-amber)" />
+  <g transform="translate(340, 386)">
+    <rect x="-46" y="-8" width="92" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#fde047">Buffer 见底 / 刷新</text>
+  </g>
+
+  <g transform="translate(230, 412)" filter="url(#boxShadow)">
+    <rect width="220" height="72" rx="10" fill="url(#cardGrad)" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="110" y="27" class="label" fill="#fef3c7">批量抓取与向量精排</text>
+    <text x="110" y="49" class="sublabel" fill="#fde68a">多轮探查 · 曝光过滤 · 写入 60 篇</text>
+  </g>
+
+  <path d="M 450 448 L 485 448 L 485 331 L 440 331" class="flow-line-indigo" marker-end="url(#arrow-indigo)" />
+  <g transform="translate(485, 386)">
+    <rect x="-26" y="-8" width="52" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#c7d2fe">装填完成</text>
+  </g>
+
+  <path d="M 340 484 L 340 532" class="flow-line-emerald" marker-end="url(#arrow-emerald)" />
+  <g transform="translate(340, 506)">
+    <rect x="-35" y="-8" width="70" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#cbd5e1">候选池见底</text>
+  </g>
+
+  <g transform="translate(155, 532)" filter="url(#boxShadow)">
+    <rect width="735" height="74" rx="10" fill="url(#cardGrad)" stroke="#10b981" stroke-width="1.6" />
+    <text x="367" y="30" class="label" font-size="14" fill="#a7f3d0">MySQL 游标分页兜底 (selectFeedRecommended · pageSize + 1)</text>
+    <text x="367" y="52" class="sublabel" font-size="11" fill="#6ee7b7">频道查询 · 候选池翻穿保底 · 下发 rec: 游标 · 防天窗留白</text>
+  </g>
+</svg>

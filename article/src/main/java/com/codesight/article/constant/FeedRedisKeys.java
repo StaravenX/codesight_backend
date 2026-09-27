@@ -58,4 +58,10 @@ public class FeedRedisKeys {
     public static String getExposedKey(Long userId) {
         return EXPOSED_PREFIX + userId;
     }
+
+    /**
+     * 用户推荐流会话临时缓冲队列 Key 前缀（LIST）
+     */
+    public static final String BUFFER_PREFIX = "feed:user:buffer:";
+
 }

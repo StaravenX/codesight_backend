@@ -37,10 +37,30 @@ public class FeedProperties {
     /**
      * 用户推荐流已读曝光最大保留条数
      */
-    private int exposedMaxCapacity = 1000;
+    private int exposedMaxCapacity = 100;
 
     /**
      * 用户推荐流已读曝光保留时长
      */
     private Duration exposedTtl = Duration.ofHours(24);
+
+    /**
+     * 用户会话推荐流 Buffer 批量填充大小
+     */
+    private int bufferBatchSize = 60;
+
+    /**
+     * 用户会话推荐流 Buffer 批量填充最大探查轮数
+     */
+    private int bufferMaxRounds = 4;
+
+    /**
+     * 用户会话推荐流 Buffer 单轮探查抓取上限
+     */
+    private int bufferFetchLimit = 80;
+
+    /**
+     * 用户会话推荐流 Buffer 存活有效期
+     */
+    private Duration bufferTtl = Duration.ofMinutes(15);
 }

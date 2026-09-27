@@ -6,6 +6,8 @@ import com.codesight.article.api.dto.response.ArticleFeedPageResponse;
 import com.codesight.article.mapper.ArticleMapper;
 import com.codesight.article.model.entity.Article;
 import com.codesight.article.model.enums.FeedSortType;
+import com.codesight.article.util.FeedCursorUtils;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
