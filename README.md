@@ -221,6 +221,14 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 
 全站各业务领域模块共享的底层基础设施与通用运行时组件：
 
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/cache_architecture_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/cache_architecture_light.svg">
+    <img alt="多级缓存与 SingleFlight 并发归并防护架构" src="docs/images/cache_architecture_dark.svg" width="100%" />
+  </picture>
+</div>
+
 - **通用三级缓存模板（MultiLevelCacheTemplate）**：
   - **分层递进架构**：泛型抽象统一纳管 `L1 Caffeine (JVM 堆内存) → L2 Redis (分布式网络缓存) → L3 Loader (数据库回源加载)`；
   - **SingleFlight 并发归并防击穿**：基于 `ConcurrentHashMap` 与 `CompletableFuture` 实现，缓存失效突发高并发时，同一 Key 仅放行首个虚拟线程执行物理回源加载，其余并发请求挂起并复用同一结果，将穿透压力收敛为常数级；

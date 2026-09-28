@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 670" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#f1f5f9" />
+    </linearGradient>
+
+    <filter id="shadowLight" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#64748b" flood-opacity="0.12" />
+    </filter>
+
+    <marker id="ar" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#94a3b8" />
+    </marker>
+    <marker id="arBlue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#2563eb" />
+    </marker>
+    <marker id="arSky" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#0284c7" />
+    </marker>
+    <marker id="arAmber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#d97706" />
+    </marker>
+    <marker id="arEmerald" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#059669" />
+    </marker>
+    <marker id="arIndigo" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#4f46e5" />
+    </marker>
+  </defs>
+
+  <style>
+    .title-main { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 700; fill: #0f172a; text-anchor: middle; }
+    .title-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10.5px; fill: #64748b; text-anchor: middle; }
+    .edge-text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 600; text-anchor: middle; }
+    .edge-bg { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; rx: 3px; }
+    .line-straight { fill: none; stroke-width: 1.6; }
+    .line-dash { stroke-dasharray: 4 3; }
+    .line-neutral { stroke: #94a3b8; }
+    .line-blue { stroke: #2563eb; }
+    .line-sky { stroke: #0284c7; }
+    .line-amber { stroke: #d97706; }
+    .line-emerald { stroke: #059669; }
+    .line-indigo { stroke: #4f46e5; }
+  </style>
+
+  <rect width="1000" height="670" rx="14" fill="url(#bgGradLight)" stroke="#e2e8f0" stroke-width="1.5" />
+
+  <g transform="translate(400, 20)" filter="url(#shadowLight)">
+    <rect width="200" height="38" rx="19" fill="#ffffff" stroke="#2563eb" stroke-width="1.4" />
+    <text x="100" y="24" class="title-main" fill="#1d4ed8">创作者发布动态</text>
+  </g>
+
+  <path d="M 500 58 L 500 82" class="line-straight line-blue" marker-end="url(#arBlue)" />
+
+  <g transform="translate(500, 118)" filter="url(#shadowLight)">
+    <polygon points="0,-36 120,0 0,36 -120,0" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5" />
+    <text x="0" y="-4" class="title-main" font-size="12.5">粉丝量双阈值判定</text>
+    <text x="0" y="13" class="title-sub" font-size="9.5" fill="#64748b">(4500~5500 缓冲维持原身份)</text>
+  </g>
+
+  <path d="M 380 118 L 180 118 L 180 180" class="line-straight line-amber" marker-end="url(#arAmber)" />
+  <g transform="translate(280, 118)">
+    <rect x="-70" y="-8" width="140" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#b45309">≥ 5500 或缓冲维持大 V</text>
+  </g>
+
+  <path d="M 620 118 L 820 118 L 820 180" class="line-straight line-sky" marker-end="url(#arSky)" />
+  <g transform="translate(720, 118)">
+    <rect x="-70" y="-8" width="140" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#0369a1">&lt; 4500 或缓冲维持普通</text>
+  </g>
+
+  <g transform="translate(70, 180)" filter="url(#shadowLight)">
+    <rect width="220" height="62" rx="8" fill="#ffffff" stroke="#d97706" stroke-width="1.4" />
+    <text x="110" y="26" class="title-main" fill="#b45309" font-size="13.5">大 V 博主</text>
+    <rect x="75" y="37" width="70" height="18" rx="9" fill="#fef3c7" stroke="#d97706" stroke-width="0.8" />
+    <text x="110" y="50" class="title-sub" fill="#b45309" font-weight="600" font-size="10.5">拉模式</text>
+  </g>
+
+  <g transform="translate(710, 180)" filter="url(#shadowLight)">
+    <rect width="220" height="62" rx="8" fill="#ffffff" stroke="#0284c7" stroke-width="1.4" />
+    <text x="110" y="26" class="title-main" fill="#0369a1" font-size="13.5">普通博主</text>
+    <rect x="75" y="37" width="70" height="18" rx="9" fill="#e0f2fe" stroke="#0284c7" stroke-width="0.8" />
+    <text x="110" y="50" class="title-sub" fill="#0369a1" font-weight="600" font-size="10.5">推模式</text>
+  </g>
+
+  <path d="M 180 242 L 180 310" class="line-straight line-amber" marker-end="url(#arAmber)" />
+  <g transform="translate(180, 276)">
+    <rect x="-46" y="-7" width="92" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#b45309">仅写自身 Outbox</text>
+  </g>
+
+  <path d="M 820 242 L 820 310" class="line-straight line-sky" marker-end="url(#arSky)" />
+  <g transform="translate(820, 276)">
+    <rect x="-44" y="-7" width="88" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#0369a1">写入自身 Outbox</text>
+  </g>
+
+  <path d="M 710 211 L 500 211 L 500 310" class="line-straight line-indigo" marker-end="url(#arIndigo)" />
+  <g transform="translate(605, 201)">
+    <rect x="-56" y="-7" width="112" height="15" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#4338ca">写扩散推入 (Inbox)</text>
+  </g>
+
+  <g transform="translate(70, 310)" filter="url(#shadowLight)">
+    <rect width="220" height="70" rx="8" fill="#ffffff" stroke="#d97706" stroke-width="1.3" />
+    <text x="110" y="28" class="title-main" fill="#b45309">大 V 发件箱 (Outbox)</text>
+    <text x="110" y="49" class="title-sub">Redis ZSet · 容量 200</text>
+  </g>
+
+  <g transform="translate(340, 335)">
+    <rect x="-48" y="-7" width="96" height="15" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#b45309">大 V 掉粉降级补偿</text>
+  </g>
+  <path d="M 290 352 L 388 352" class="line-straight line-amber line-dash" marker-end="url(#arAmber)" />
+
+  <g transform="translate(390, 310)" filter="url(#shadowLight)">
+    <rect width="220" height="70" rx="8" fill="#ffffff" stroke="#4f46e5" stroke-width="1.4" />
+    <text x="110" y="28" class="title-main" fill="#4338ca">粉丝收件箱 (Inbox)</text>
+    <text x="110" y="49" class="title-sub">Redis ZSet · 容量 200 (写扩散核心)</text>
+  </g>
+
+  <g transform="translate(660, 335)">
+    <rect x="-44" y="-7" width="88" height="15" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#4338ca">新关注历史回填</text>
+  </g>
+  <path d="M 710 352 L 612 352" class="line-straight line-indigo line-dash" marker-end="url(#arIndigo)" />
+
+  <g transform="translate(710, 310)" filter="url(#shadowLight)">
+    <rect width="220" height="70" rx="8" fill="#ffffff" stroke="#0284c7" stroke-width="1.3" />
+    <text x="110" y="28" class="title-main" fill="#0369a1">普通博主发件箱 (Outbox)</text>
+    <text x="110" y="49" class="title-sub">Redis ZSet · 存量备查</text>
+  </g>
+
+  <path d="M 180 380 L 180 435" class="line-straight line-amber" marker-end="url(#arAmber)" />
+  <g transform="translate(180, 407)">
+    <rect x="-62" y="-7" width="124" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#b45309">并发拉取 (大 V Outbox)</text>
+  </g>
+
+  <path d="M 500 380 L 500 435" class="line-straight line-indigo" marker-end="url(#arIndigo)" />
+  <g transform="translate(500, 407)">
+    <rect x="-58" y="-7" width="116" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#4338ca">并发读取 (个人 Inbox)</text>
+  </g>
+
+  <g transform="translate(70, 435)" filter="url(#shadowLight)">
+    <rect width="860" height="90" rx="10" fill="#ffffff" stroke="#059669" stroke-width="1.6" />
+    <text x="430" y="30" class="title-main" font-size="14" fill="#065f46">多路时间戳倒序归并 (K-Way Merge 引擎)</text>
+    <text x="430" y="53" class="title-sub" font-size="11">Redis Pipeline 单包同时并发拉取大 V Outbox 与个人 Inbox · 内存优先队列排序 · 临界动态去重</text>
+    <text x="430" y="73" class="title-sub" font-size="10.5" fill="#047857">动态合并双源 ZSet 流 · 按时间戳倒序对齐 · 生成连续 Keyset 游标切片</text>
+  </g>
+
+  <path d="M 430 585 L 430 525" class="line-straight line-emerald" marker-end="url(#arEmerald)" />
+  <g transform="translate(430, 555)">
+    <rect x="-48" y="-7" width="96" height="15" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#047857">① 发起拉取 (带游标)</text>
+  </g>
+
+  <path d="M 570 525 L 570 585" class="line-straight line-emerald" marker-end="url(#arEmerald)" />
+  <g transform="translate(570, 555)">
+    <rect x="-48" y="-7" width="96" height="15" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#047857">② Keyset 切片返回</text>
+  </g>
+
+  <g transform="translate(360, 585)" filter="url(#shadowLight)">
+    <rect width="280" height="42" rx="21" fill="#ffffff" stroke="#059669" stroke-width="1.6" />
+    <text x="140" y="26" class="title-main" fill="#065f46">读者拉取 GET /feed/following</text>
+  </g>
+</svg>

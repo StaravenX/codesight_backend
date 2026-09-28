@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+
+    <filter id="shadowLight" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+
+    <marker id="arLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#64748b" />
+    </marker>
+    <marker id="arBlueLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#2563eb" />
+    </marker>
+    <marker id="arPurpleLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#7c3aed" />
+    </marker>
+    <marker id="arAmberLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#d97706" />
+    </marker>
+    <marker id="arEmeraldLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#059669" />
+    </marker>
+    <marker id="arIndigoLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#4f46e5" />
+    </marker>
+  </defs>
+
+  <style>
+    .title-main { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 700; fill: #0f172a; text-anchor: middle; }
+    .title-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px; fill: #475569; text-anchor: middle; }
+    .edge-text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 500; text-anchor: middle; }
+    .edge-bg { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; rx: 3px; }
+    .line-straight { fill: none; stroke-width: 1.5; }
+    .line-neutral { stroke: #94a3b8; }
+    .line-dash { stroke: #94a3b8; stroke-dasharray: 4 3; }
+    .line-blue { stroke: #2563eb; }
+    .line-purple { stroke: #7c3aed; }
+    .line-amber { stroke: #d97706; }
+    .line-emerald { stroke: #059669; }
+    .line-indigo { stroke: #4f46e5; }
+  </style>
+
+  <rect width="960" height="500" rx="14" fill="url(#bgGradLight)" stroke="#e2e8f0" stroke-width="1.5" />
+
+  <g transform="translate(60, 20)" filter="url(#shadowLight)">
+    <rect width="390" height="38" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.3" />
+    <text x="195" y="24" class="title-main" fill="#1d4ed8">点赞 / 收藏 / 关注 (状态型互动)</text>
+  </g>
+
+  <g transform="translate(510, 20)" filter="url(#shadowLight)">
+    <rect width="390" height="38" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1.3" />
+    <text x="195" y="24" class="title-main" fill="#92400e">文章浏览 PV (访问型事件)</text>
+  </g>
+
+  <path d="M 255 58 L 255 86" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <path d="M 705 58 L 705 86" class="line-straight line-amber" marker-end="url(#arAmberLight)" />
+
+  <g transform="translate(60, 86)" filter="url(#shadowLight)">
+    <rect width="390" height="48" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.4" />
+    <text x="195" y="22" class="title-main" fill="#1d4ed8">4KB 分片位图判重 (Redis BitMap)</text>
+    <text x="195" y="38" class="title-sub">userId / 32768 · toggle_bit.lua 原子翻转 (无变动丢弃)</text>
+  </g>
+
+  <g transform="translate(510, 86)" filter="url(#shadowLight)">
+    <rect width="390" height="48" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.4" />
+    <text x="195" y="22" class="title-main" fill="#b45309">PV 防刷滑动窗口 (频控去重)</text>
+    <text x="195" y="38" class="title-sub">5 分钟窗口 · 用户 / IP 频控去重 · 累加作者获阅读</text>
+  </g>
+
+  <path d="M 255 134 L 255 164" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(255, 149)">
+    <rect x="-24" y="-7" width="48" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#1d4ed8">跃迁事件</text>
+  </g>
+
+  <path d="M 705 134 L 705 164" class="line-straight line-amber" marker-end="url(#arAmberLight)" />
+  <g transform="translate(705, 149)">
+    <rect x="-22" y="-7" width="44" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#b45309">有效 PV</text>
+  </g>
+
+  <g transform="translate(140, 164)" filter="url(#shadowLight)">
+    <rect width="680" height="52" rx="8" fill="#ffffff" stroke="#d97706" stroke-width="1.4" />
+    <text x="340" y="24" class="title-main" fill="#b45309">Kafka 核心事件总线 (Topic: counter-events)</text>
+    <text x="340" y="41" class="title-sub">实体键分区保序 (3 分区) · 全站互动行为广播事件源</text>
+  </g>
+
+  <path d="M 255 216 L 255 246" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(255, 231)">
+    <rect x="-34" y="-7" width="68" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#1d4ed8">counter-agg</text>
+  </g>
+
+  <path d="M 705 216 L 705 246" class="line-straight line-emerald" marker-end="url(#arEmeraldLight)" />
+  <g transform="translate(705, 231)">
+    <rect x="-48" y="-7" width="96" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#059669">article-recommend-rank</text>
+  </g>
+
+  <g transform="translate(60, 246)" filter="url(#shadowLight)">
+    <rect width="390" height="50" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.3" />
+    <text x="195" y="22" class="title-main" fill="#1d4ed8">消费者滑动聚合桶 (Hash 削峰)</text>
+    <text x="195" y="39" class="title-sub">1 秒滑动窗口 · 批量聚合 · incr_field.lua 刷盘</text>
+  </g>
+
+  <g transform="translate(510, 246)" filter="url(#shadowLight)">
+    <rect width="390" height="50" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.3" />
+    <text x="195" y="22" class="title-main" fill="#065f46">推荐打分与画像联动消费者 (RecommendRankConsumer)</text>
+    <text x="195" y="39" class="title-sub">监听全量互动事件流 · 驱动推荐池推高与画像沉淀</text>
+  </g>
+
+  <path d="M 255 296 L 255 326" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(255, 311)">
+    <rect x="-24" y="-7" width="48" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#1d4ed8">批量写入</text>
+  </g>
+
+  <path d="M 605 296 L 605 326" class="line-straight line-emerald" marker-end="url(#arEmeraldLight)" />
+  <path d="M 805 296 L 805 326" class="line-straight line-emerald" marker-end="url(#arEmeraldLight)" />
+
+  <g transform="translate(60, 326)" filter="url(#shadowLight)">
+    <rect width="390" height="60" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.6" />
+    <text x="195" y="24" class="title-main" font-size="13" fill="#1d4ed8">16B SDS 计数快照 (Redis String)</text>
+    <text x="195" y="42" class="title-sub">4 指标 × 4B uint32 大端定长 (定长 16 字节)</text>
+    <text x="195" y="54" class="title-sub" fill="#2563eb">文章: 浏览/点赞/评论/收藏 · 用户: 获阅/获赞/粉丝/关注</text>
+  </g>
+
+  <g transform="translate(510, 326)" filter="url(#shadowLight)">
+    <rect width="190" height="60" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.3" />
+    <text x="95" y="24" class="title-main" fill="#065f46">推荐池实时推高</text>
+    <text x="95" y="42" class="title-sub">ZINCRBY 动态加权</text>
+    <text x="95" y="54" class="title-sub">推高候选池排序分</text>
+  </g>
+
+  <g transform="translate(710, 326)" filter="url(#shadowLight)">
+    <rect width="190" height="60" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.3" />
+    <text x="95" y="24" class="title-main" fill="#065f46">用户偏好向量画像</text>
+    <text x="95" y="42" class="title-sub">正向反馈滑动窗口</text>
+    <text x="95" y="54" class="title-sub">动态更新 AI 画像</text>
+  </g>
+
+  <path d="M 155 386 L 155 416" class="line-straight line-dash" marker-end="url(#arLight)" />
+  <g transform="translate(155, 401)">
+    <rect x="-30" y="-7" width="60" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#64748b">每 60s 刷盘</text>
+  </g>
+
+  <path d="M 355 386 L 355 416" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(355, 401)">
+    <rect x="-30" y="-7" width="60" height="14" class="edge-bg" />
+    <text class="edge-text" y="3.5" fill="#1d4ed8">MGET 拉取</text>
+  </g>
+
+  <path d="M 605 386 L 605 416" class="line-straight line-neutral" marker-end="url(#arLight)" />
+  <path d="M 805 386 L 805 416" class="line-straight line-emerald line-dash" marker-end="url(#arEmeraldLight)" />
+
+  <g transform="translate(60, 416)" filter="url(#shadowLight)">
+    <rect width="190" height="60" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="1.2" />
+    <text x="95" y="24" class="title-main" fill="#1e293b">MySQL 异步持久化</text>
+    <text x="95" y="42" class="title-sub">定时批量回写脏计数</text>
+    <text x="95" y="54" class="title-sub">数据库底层真值兜底</text>
+  </g>
+
+  <g transform="translate(260, 416)" filter="url(#shadowLight)">
+    <rect width="190" height="60" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.3" />
+    <text x="95" y="24" class="title-main" fill="#1d4ed8">Feed 读路径装配</text>
+    <text x="95" y="42" class="title-sub">ArticleFeedHydrator</text>
+    <text x="95" y="54" class="title-sub">MGET 单包 · 0 反序列化</text>
+  </g>
+
+  <g transform="translate(510, 416)" filter="url(#shadowLight)">
+    <rect width="190" height="60" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="1.2" />
+    <text x="95" y="24" class="title-main" fill="#1e293b">脏标记驱动落盘</text>
+    <text x="95" y="42" class="title-sub">counter:dirty:articles</text>
+    <text x="95" y="54" class="title-sub">Redis Set 集合维护</text>
+  </g>
+
+  <g transform="translate(710, 416)" filter="url(#shadowLight)">
+    <rect width="190" height="60" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.3" />
+    <text x="95" y="24" class="title-main" fill="#065f46">双模式自愈保障</text>
+    <text x="95" y="42" class="title-sub">① 运行时: Redisson+SPI</text>
+    <text x="95" y="54" class="title-sub">② 灾难时: Kafka 重放</text>
+  </g>
+</svg>

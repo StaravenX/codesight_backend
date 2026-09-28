@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+
+    <filter id="shadowLight" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.06" />
+    </filter>
+
+    <marker id="arBlueLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#2563eb" />
+    </marker>
+    <marker id="arEmeraldLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#059669" />
+    </marker>
+    <marker id="arAmberLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#d97706" />
+    </marker>
+    <marker id="arPurpleLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#7c3aed" />
+    </marker>
+    <marker id="arRedLight" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 2 L 8 5 L 0 8 z" fill="#dc2626" />
+    </marker>
+  </defs>
+
+  <style>
+    .node-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 700; fill: #0f172a; text-anchor: middle; }
+    .node-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px; fill: #475569; text-anchor: middle; }
+    .edge-text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 500; text-anchor: middle; }
+    .edge-bg { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; rx: 3px; }
+    .line-straight { fill: none; stroke-width: 1.6; }
+    .line-dash { stroke-dasharray: 4 3; }
+    .line-blue { stroke: #2563eb; }
+    .line-emerald { stroke: #059669; }
+    .line-amber { stroke: #d97706; }
+    .line-purple { stroke: #7c3aed; }
+    .line-red { stroke: #dc2626; }
+  </style>
+
+  <rect width="960" height="600" rx="14" fill="url(#bgGradLight)" stroke="#e2e8f0" stroke-width="1.5" />
+
+  <g transform="translate(370, 24)" filter="url(#shadowLight)">
+    <rect width="260" height="46" rx="23" fill="#ffffff" stroke="#2563eb" stroke-width="1.4" />
+    <text x="130" y="22" class="node-title" fill="#1d4ed8">客户端并发请求</text>
+    <text x="130" y="37" class="node-sub">HTTP GET /articles/{id}</text>
+  </g>
+
+  <path d="M 500 70 L 500 115" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+
+  <g transform="translate(360, 115)" filter="url(#shadowLight)">
+    <rect width="280" height="54" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.4" />
+    <text x="140" y="24" class="node-title" fill="#1d4ed8">L1 本地缓存 (Caffeine)</text>
+    <text x="140" y="41" class="node-sub">JVM 堆内存 · 极速直读 (~0.01ms)</text>
+  </g>
+
+  <path d="M 640 135 L 760 135 L 760 47 L 630 47" class="line-straight line-emerald" marker-end="url(#arEmeraldLight)" />
+  <g transform="translate(760, 91)">
+    <rect x="-48" y="-9" width="96" height="18" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#059669">① L1 命中返回</text>
+  </g>
+
+  <path d="M 500 169 L 500 215" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(500, 192)">
+    <rect x="-32" y="-8" width="64" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#64748b">② 未命中</text>
+  </g>
+
+  <g transform="translate(360, 215)" filter="url(#shadowLight)">
+    <rect width="280" height="54" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.4" />
+    <text x="140" y="24" class="node-title" fill="#047857">L2 分布式缓存 (Redis)</text>
+    <text x="140" y="41" class="node-sub">分布式网络内存 · 跨节点共享</text>
+  </g>
+
+  <path d="M 360 242 L 240 242 L 240 47 L 370 47" class="line-straight line-red" marker-end="url(#arRedLight)" />
+  <g transform="translate(240, 144)">
+    <rect x="-72" y="-9" width="144" height="18" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#dc2626">③ 命中空值哨兵 (阻断穿透)</text>
+  </g>
+
+  <path d="M 640 242 L 760 242 L 760 155 L 640 155" class="line-straight line-emerald" marker-end="url(#arEmeraldLight)" />
+  <g transform="translate(760, 198)">
+    <rect x="-56" y="-9" width="112" height="18" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#059669">④ 命中有效 (回填 L1)</text>
+  </g>
+
+  <path d="M 500 269 L 500 315" class="line-straight line-amber" marker-end="url(#arAmberLight)" />
+  <g transform="translate(500, 292)">
+    <rect x="-55" y="-8" width="110" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#d97706">⑤ 未命中 (并发收敛)</text>
+  </g>
+
+  <g transform="translate(330, 315)" filter="url(#shadowLight)">
+    <rect width="340" height="48" rx="8" fill="#ffffff" stroke="#d97706" stroke-width="1.4" />
+    <text x="170" y="22" class="node-title" fill="#92400e">SingleFlight 控制器</text>
+    <text x="170" y="36" class="node-sub">ConcurrentHashMap&lt;Key, CompletableFuture&gt;</text>
+  </g>
+
+  <path d="M 400 363 L 400 380 L 260 380 L 260 400" class="line-straight line-purple" marker-end="url(#arPurpleLight)" />
+  <g transform="translate(330, 380)">
+    <rect x="-52" y="-8" width="104" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#7c3aed">⑥ 注册成功 (Leader)</text>
+  </g>
+
+  <path d="M 600 363 L 600 380 L 740 380 L 740 400" class="line-straight line-blue" marker-end="url(#arBlueLight)" />
+  <g transform="translate(670, 380)">
+    <rect x="-56" y="-8" width="112" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#2563eb">⑦ 已有任务 (Followers)</text>
+  </g>
+
+  <g transform="translate(90, 400)" filter="url(#shadowLight)">
+    <rect width="340" height="95" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4" />
+    <text x="170" y="24" class="node-title" fill="#6b21a8">Leader 线程 (首发加载者)</text>
+    <text x="170" y="46" class="node-sub">1. Double-Check 再次查 Redis 防并发间隙</text>
+    <text x="170" y="64" class="node-sub">2. 执行 dbLoader.get() 单次物理回源</text>
+    <text x="170" y="82" class="node-sub" fill="#059669">3. 回填 L2 (TTL 动态抖动) + 回填 L1 Caffeine</text>
+  </g>
+
+  <g transform="translate(570, 400)" filter="url(#shadowLight)">
+    <rect width="340" height="95" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.4" />
+    <text x="170" y="24" class="node-title" fill="#1d4ed8">Followers 线程 (并发等待者)</text>
+    <text x="170" y="46" class="node-sub">1. 调用 existing.join() 挂起阻塞等待</text>
+    <text x="170" y="64" class="node-sub">2. 共享复用 Leader 的物理加载结果</text>
+    <text x="170" y="82" class="node-sub" fill="#059669">3. 零额外 DB 访问 · 直接响应客户端</text>
+  </g>
+
+  <path d="M 430 447 L 570 447" class="line-straight line-purple line-dash" marker-end="url(#arPurpleLight)" />
+  <g transform="translate(500, 447)">
+    <rect x="-56" y="-8" width="112" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#7c3aed">future.complete() 广播</text>
+  </g>
+
+  <path d="M 260 495 L 260 549 L 340 549" class="line-straight line-purple" marker-end="url(#arPurpleLight)" />
+  <g transform="translate(260, 522)">
+    <rect x="-42" y="-8" width="84" height="16" class="edge-bg" />
+    <text class="edge-text" y="4" fill="#7c3aed">单次物理回源</text>
+  </g>
+
+  <g transform="translate(340, 525)" filter="url(#shadowLight)">
+    <rect width="320" height="48" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.4" />
+    <text x="160" y="22" class="node-title" fill="#1e293b">MySQL 8.0 数据库 (持久层)</text>
+    <text x="160" y="37" class="node-sub">单次加载 · 80 突发并发收敛为 1 次</text>
+  </g>
+</svg>
