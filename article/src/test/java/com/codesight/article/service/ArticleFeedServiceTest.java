@@ -235,7 +235,7 @@ class ArticleFeedServiceTest {
             mockList.add(createArticle(i, 100L, 1L, now.minusSeconds(i * 60), i * 10, i * 2));
         }
 
-        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
+        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
                 .thenReturn(mockList);
 
         UserBaseInfo author = new UserBaseInfo(100L, "极客作者", "https://example.com/a.png", null, null, null);
@@ -277,7 +277,7 @@ class ArticleFeedServiceTest {
             mockList.add(createArticle(i, 100L, 1L, now.minusSeconds(i * 60), 100L, 20L));
         }
 
-        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), any(Instant.class), eq(10L), eq(21)))
+        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), any(Instant.class), eq(10L), eq(21)))
                 .thenReturn(mockList);
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
@@ -579,10 +579,10 @@ class ArticleFeedServiceTest {
                 createArticle(102L, 300L, 1L, now, 20L, 8L)
         );
 
-        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
+        Long currentUserId = 888L;
+        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), eq(currentUserId), isNull(), isNull(), eq(21)))
                 .thenReturn(mockList);
 
-        Long currentUserId = 888L;
         Map<String, Boolean> mockIsLikedMap = Map.of(
                 "101", true,
                 "102", false
@@ -606,7 +606,7 @@ class ArticleFeedServiceTest {
     @Test
     @DisplayName("测试异常/非法游标容错：不抛异常，优雅降级为首屏检索")
     void testCorruptedCursorFallback() {
-        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
+        when(articleMapper.selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21)))
                 .thenReturn(Collections.emptyList());
 
         ArticleFeedRequest request = ArticleFeedRequest.builder()
@@ -622,7 +622,7 @@ class ArticleFeedServiceTest {
         });
 
         // 验证降级后 cursorTime 和 cursorId 传入 null 从首屏查
-        verify(articleMapper, times(1)).selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), eq(21));
+        verify(articleMapper, times(1)).selectFeedNewest(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq(21));
     }
 
     @Test

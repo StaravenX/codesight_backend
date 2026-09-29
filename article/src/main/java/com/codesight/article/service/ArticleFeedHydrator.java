@@ -103,6 +103,7 @@ public class ArticleFeedHydrator {
                     .collectCount(collectCount)
                     .isLiked(isLiked)
                     .isTop(Boolean.TRUE.equals(a.getIsTop()))
+                    .visible(a.getVisible() != null ? a.getVisible().name().toLowerCase() : "public")
                     .build();
 
             items.add(item);

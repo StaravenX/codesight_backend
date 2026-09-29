@@ -68,4 +68,7 @@ public class ArticleFeedItemResponse {
 
     @Schema(description = "创作者主页是否置顶")
     private Boolean isTop;
+
+    @Schema(description = "文章可见性：public=公开，private=仅自己可见")
+    private String visible;
 }

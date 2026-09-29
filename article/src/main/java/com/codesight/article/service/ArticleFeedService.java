@@ -37,6 +37,9 @@ public class ArticleFeedService {
      * @return 分页信息流响应体
      */
     public ArticleFeedPageResponse getFeed(ArticleFeedRequest request, Long currentUserId) {
+        if (request.authorId() != null) {
+            return getNewestFeed(request, currentUserId);
+        }
         FeedSortType sortType = (request.sortBy() != null) ? request.sortBy() : FeedSortType.RECOMMENDED;
         return switch (sortType) {
             case FOLLOWING -> articleFollowingFeedService.getFollowingFeed(request, currentUserId);
@@ -110,6 +113,7 @@ public class ArticleFeedService {
                 request.categoryId(),
                 request.tagId(),
                 request.authorId(),
+                currentUserId,
                 cursorTime,
                 cursorId,
                 limitSize

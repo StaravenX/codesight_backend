@@ -9,7 +9,10 @@
         <if test="tagId != null">
             INNER JOIN article_tag_rel atr ON a.id = atr.article_id AND atr.tag_id = #{tagId}
         </if>
-        WHERE a.status = 'published' AND a.visible = 'public'
+        WHERE a.status = 'published'
+        <if test="authorId == null or currentUserId == null or authorId != currentUserId">
+            AND a.visible = 'public'
+        </if>
         <if test="categoryId != null">
             AND a.category_id = #{categoryId}
         </if>

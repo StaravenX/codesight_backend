@@ -21,6 +21,7 @@ public interface ArticleMapper extends BaseMapper<Article> {
             @Param("categoryId") Long categoryId,
             @Param("tagId") Long tagId,
             @Param("authorId") Long authorId,
+            @Param("currentUserId") Long currentUserId,
             @Param("cursorTime") Instant cursorTime,
             @Param("cursorId") Long cursorId,
             @Param("limitSize") int limitSize
