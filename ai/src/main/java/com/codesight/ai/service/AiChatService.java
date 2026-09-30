@@ -174,7 +174,7 @@ public class AiChatService {
                 ? searchService.searchRelevantArticles(question, 3)
                 : Collections.emptyList();
 
-        Prompt prompt = buildRagPrompt(question, relevantDocs);
+        Prompt prompt = buildRagPrompt(question, relevantDocs, request.chatHistory());
         return executeStreamChat(prompt, "全站知识库 RAG 流式问答异常");
     }
 
@@ -213,9 +213,9 @@ public class AiChatService {
     /**
      * 动态装配 RAG 提示词
      */
-    private Prompt buildRagPrompt(String question, List<ArticleSearchDoc> docs) {
+    private Prompt buildRagPrompt(String question, List<ArticleSearchDoc> docs, List<AiChatRequest.ChatMessage> chatHistory) {
         StringBuilder systemContent = new StringBuilder("""
-                你是 Codesight 技术社区的全站知识库专家。请结合站内检索出的真实技术文章，客观、严谨地回答用户的问题。
+                你是 Codesight 技术社区的全站知识库专家。请结合站内检索出的技术资料与专业知识，客观、严谨、自然地回答用户的问题。
 
                 回答要求：
                 1. 优先基于【站内参考文章】组织解答。若引用了某篇参考文章的具体结论或设计，请在对应解答处标明引用，如：参考自《文章标题》。
@@ -246,6 +246,20 @@ public class AiChatService {
 
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(systemContent.toString()));
+
+        // 注入历史多轮对话上下文
+        if (chatHistory != null) {
+            for (AiChatRequest.ChatMessage msg : chatHistory) {
+                if (msg != null && msg.content() != null && !msg.content().isBlank()) {
+                    if ("assistant".equalsIgnoreCase(msg.role())) {
+                        messages.add(new AssistantMessage(msg.content()));
+                    } else {
+                        messages.add(new UserMessage(msg.content()));
+                    }
+                }
+            }
+        }
+
         messages.add(new UserMessage("【用户提问】\n" + question));
         return new Prompt(messages);
     }

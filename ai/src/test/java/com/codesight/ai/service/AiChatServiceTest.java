@@ -192,4 +192,29 @@ class AiChatServiceTest {
         assertEquals("站内暂无收录，基于通用经验建议如下：...",
                 chunks.getFirst().choices().getFirst().delta().content());
     }
+
+    @Test
+    @DisplayName("测试全站知识库 RAG 流式问答（携带历史对话上下文）")
+    void testStreamRagChat_WithChatHistory() {
+        when(searchService.searchRelevantArticles("继续追问", 3))
+                .thenReturn(List.of());
+
+        Generation gen = new Generation(new AssistantMessage("结合上文，进一步说明如下：..."));
+        ChatResponse chatResponse = new ChatResponse(List.of(gen));
+        when(chatModel.stream(any(Prompt.class))).thenReturn(Flux.just(chatResponse));
+
+        RagChatRequest request = new RagChatRequest(
+                "继续追问",
+                List.of(
+                        new AiChatRequest.ChatMessage("user", "前文问题"),
+                        new AiChatRequest.ChatMessage("assistant", "前文回答")
+                )
+        );
+        List<OpenAiApi.ChatCompletionChunk> chunks = aiChatService.streamRagChat(request).collectList().block();
+
+        assertNotNull(chunks);
+        assertFalse(chunks.isEmpty());
+        assertEquals("结合上文，进一步说明如下：...",
+                chunks.getFirst().choices().getFirst().delta().content());
+    }
 }
