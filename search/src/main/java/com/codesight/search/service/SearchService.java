@@ -51,6 +51,9 @@ public class SearchService {
     private final EmbeddingModel embeddingModel;
     private final ArticleVectorService articleVectorService;
 
+    // RAG 知识检索余弦打分最低阈值。
+    private static final double MIN_RAG_SIMILARITY_SCORE = 0.70;
+
     /**
      * 关键词全文检索
      *
@@ -396,6 +399,7 @@ public class SearchService {
             }
 
             return resp.hits().hits().stream()
+                    .filter(h -> h.score() == null || h.score() >= MIN_RAG_SIMILARITY_SCORE)
                     .map(Hit::source)
                     .filter(Objects::nonNull)
                     .toList();

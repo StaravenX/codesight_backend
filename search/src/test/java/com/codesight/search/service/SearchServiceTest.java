@@ -404,6 +404,7 @@ class SearchServiceTest {
 
         Hit<ArticleSearchDoc> mockHit = mock(Hit.class);
         when(mockHit.source()).thenReturn(doc);
+        when(mockHit.score()).thenReturn(0.85);
 
         HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
         when(mockHitsMetadata.hits()).thenReturn(List.of(mockHit));
@@ -419,5 +420,32 @@ class SearchServiceTest {
         assertEquals(1001L, docs.getFirst().articleId());
         assertEquals("Spring Boot 虚拟线程深度解析", docs.getFirst().title());
         verify(es, times(1)).search(any(Function.class), eq(ArticleSearchDoc.class));
+    }
+
+    @Test
+    void testSearchRelevantArticles_LowScoreFiltered() throws IOException {
+        String question = "今天天气怎么样";
+        ArticleSearchDoc doc = ArticleSearchDoc.builder()
+                .articleId(1002L)
+                .title("无关文章")
+                .summary("无关内容")
+                .body("无关内容")
+                .build();
+
+        Hit<ArticleSearchDoc> mockHit = mock(Hit.class);
+        when(mockHit.source()).thenReturn(doc);
+        when(mockHit.score()).thenReturn(0.55);
+
+        HitsMetadata<ArticleSearchDoc> mockHitsMetadata = mock(HitsMetadata.class);
+        when(mockHitsMetadata.hits()).thenReturn(List.of(mockHit));
+
+        SearchResponse<ArticleSearchDoc> mockEsResponse = mock(SearchResponse.class);
+        when(mockEsResponse.hits()).thenReturn(mockHitsMetadata);
+        doReturn(mockEsResponse).when(es).search(any(Function.class), eq(ArticleSearchDoc.class));
+
+        List<ArticleSearchDoc> docs = searchService.searchRelevantArticles(question, 3);
+
+        assertNotNull(docs);
+        assertTrue(docs.isEmpty());
     }
 }
