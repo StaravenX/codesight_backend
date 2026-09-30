@@ -71,4 +71,10 @@ public class ArticleFeedItemResponse {
 
     @Schema(description = "文章可见性：public=公开，private=仅自己可见")
     private String visible;
+
+    @Schema(description = "文章状态：published=已发布，draft=草稿")
+    private String status;
+
+    @Schema(description = "文章最后修改时间")
+    private Instant updatedTime;
 }

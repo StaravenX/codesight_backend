@@ -96,7 +96,7 @@ public class ArticleFeedHydrator {
                     .authorName(author != null ? author.nickname() : "知识作者")
                     .categoryId(a.getCategoryId())
                     .tags(articleTagsMap.getOrDefault(a.getId(), Collections.emptyList()))
-                    .publishTime(a.getPublishTime())
+                    .publishTime(a.getPublishTime() != null ? a.getPublishTime() : a.getUpdatedTime())
                     .viewCount(viewCount)
                     .likeCount(likeCount)
                     .commentCount(commentCount)
@@ -104,6 +104,8 @@ public class ArticleFeedHydrator {
                     .isLiked(isLiked)
                     .isTop(Boolean.TRUE.equals(a.getIsTop()))
                     .visible(a.getVisible() != null ? a.getVisible().name().toLowerCase() : "public")
+                    .status(a.getStatus() != null ? a.getStatus().name().toLowerCase() : "published")
+                    .updatedTime(a.getUpdatedTime())
                     .build();
 
             items.add(item);

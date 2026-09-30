@@ -9,26 +9,30 @@
         <if test="tagId != null">
             INNER JOIN article_tag_rel atr ON a.id = atr.article_id AND atr.tag_id = #{tagId}
         </if>
-        WHERE a.status = 'published'
-        <if test="authorId == null or currentUserId == null or authorId != currentUserId">
-            AND a.visible = 'public'
-        </if>
-        <if test="categoryId != null">
-            AND a.category_id = #{categoryId}
-        </if>
-        <if test="authorId != null">
-            AND a.author_id = #{authorId}
-        </if>
-        <if test="cursorTime != null and cursorId != null">
-            <![CDATA[
-            AND (a.publish_time < #{cursorTime} OR (a.publish_time = #{cursorTime} AND a.id < #{cursorId}))
-            ]]>
-        </if>
+        <where>
+            <if test="authorId != null and currentUserId != null and authorId.equals(currentUserId)">
+                AND a.status IN ('published', 'draft')
+            </if>
+            <if test="authorId == null or currentUserId == null or !authorId.equals(currentUserId)">
+                AND a.status = 'published' AND a.visible = 'public'
+            </if>
+            <if test="categoryId != null">
+                AND a.category_id = #{categoryId}
+            </if>
+            <if test="authorId != null">
+                AND a.author_id = #{authorId}
+            </if>
+            <if test="cursorTime != null and cursorId != null">
+                <![CDATA[
+                AND (COALESCE(a.publish_time, a.updated_time) < #{cursorTime} OR (COALESCE(a.publish_time, a.updated_time) = #{cursorTime} AND a.id < #{cursorId}))
+                ]]>
+            </if>
+        </where>
         ORDER BY
         <if test="authorId != null">
             a.is_top DESC,
         </if>
-        a.publish_time DESC, a.id DESC
+        COALESCE(a.publish_time, a.updated_time) DESC, a.id DESC
         LIMIT #{limitSize}
     </select>
 
