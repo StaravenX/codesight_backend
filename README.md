@@ -46,13 +46,13 @@
 
 ## 核心技术亮点
 
-- **安全认证与权限防护**：RS256 非对称私钥签名与公钥验签解耦；基于 Access/Refresh Token 双令牌体系与 Redis 白名单，刷新时执行 `jti` 轮转作废并严防重放攻击；结合 Lua 原子防爆破与账号/IP 双维度安全锁定。
-- **三级缓存与防击穿体系**：设计通用 `MultiLevelCacheTemplate`（L1 Caffeine 3.03ms → L2 Redis 4.44ms → L3 MySQL 14.89ms）；通过 SingleFlight 将瞬时突发冷数据回源压缩为单次物理加载，辅以空值哨兵与 TTL 动态抖动立体防线。
-- **自研紧凑计数中台**：设计 16 字节定长 SDS 计数快照与 4KB 分片位图原子翻转判重，经 Kafka 异步削峰聚合；支持业务 SPI 锁防击穿自愈，并具备基于事件溯源的 Kafka 灾难全量历史回放能力。
-- **三种 Feed 流（推荐 / 最新 / 关注）**：全链路复合分页；**推荐流**构建全站 Redis ZSET Top-3000 动态候选池，采用 **Session Feed Buffer 会话缓冲架构**（Redis List 预排 60 篇 + offset 切片防漏篇），串联曝光过滤与 AI 双向向量感知（余弦相似度 ≥0.85 负向语义剪枝 + 正向加权精排）；**关注流**引入**推拉结合架构**与大 V 粉丝双阈值（5500/4500）状态机平衡写放大与读延迟。
-- **混合检索与 300ms 超时熔断**：BM25 + 向量 KNN 以 RRF（k=60）融合排序，Embedding 接口注入 300ms 严格超时断路器，超时自动平滑降级纯 BM25 检索，阻断慢依赖级联雪崩。
+- **安全认证与权限防护**：RS256 非对称私钥签名与公钥验签解耦；基于 Access/Refresh Token 双令牌体系与 Redis 白名单，刷新时执行 `jti` 轮转作废并防重放攻击；结合 Lua 原子防爆破与账号/IP 双维度安全锁定。
+- **三级缓存与防击穿体系**：设计通用 `MultiLevelCacheTemplate`（L1 Caffeine 3.03ms → L2 Redis 4.44ms → L3 MySQL 14.89ms）；通过 SingleFlight 在单实例内将瞬时突发冷数据回源收敛为单次物理加载，辅以空值哨兵与 TTL 动态抖动防穿透与雪崩。
+- **高性能紧凑计数中台**：设计 16 字节定长 SDS 计数快照与 4KB 分片位图原子翻转判重，经 Kafka 异步削峰聚合；支持业务 SPI 锁防击穿自愈与 Kafka 事件溯源自愈。
+- **三种 Feed 流（推荐 / 最新 / 关注）**：全链路复合分页；推荐流基于 Redis ZSET Top-3000 候选池与会话 Buffer 切片，结合曝光过滤与双向向量感知（余弦相似度 ≥0.85 语义剪枝 + 0.4/0.6 线性精排）；关注流采用推拉结合与 5500/4500 粉丝双阈值状态机平衡写放大与读延迟。
+- **混合检索与 300ms 异步超时保护**：BM25 + 向量 KNN 以 RRF（k=60）融合排序；Embedding 接口配置 300ms 异步超时保护，超时自动降级为纯 BM25 检索，避免慢依赖级联雪崩。
 - **全链路 AI 问答应用**：基于 OpenAI 兼容协议构建单篇伴读流式问答（SSE）、智能追问推荐，以及全站知识库 RAG 问答（提问向量化 → ES KNN 召回 3 篇站内文档 → 带标题引用流式生成）。
-- **统一向量资产沉淀与多场景复用**：文章发布/更新时一次性特征提取生成 1536 维密集向量，经 Kafka 异步沉淀为全局向量资产（Redis 内存层 + ES 向量索引）；支撑 **4 大业务场景全局复用**：① 推荐流负向语义剪枝与正向加权精排，② 相似文章 Top-5 KNN 推荐，③ BM25+KNN 混合检索，④ 全站知识库 RAG 引用问答。
+- **统一向量资产沉淀与多场景复用**：文章发布/更新时一次性特征提取生成 1536 维密集向量，经 Kafka 异步沉淀为全局向量资产（Redis 内存层 + ES 向量索引）；支撑 **4 大业务场景复用**：① 推荐流负向语义剪枝与正向加权精排，② 相似文章 Top-5 KNN 推荐，③ BM25+KNN 混合检索，④ 全站知识库 RAG 引用问答。
 
 ## 系统架构与模块分层
 
@@ -188,7 +188,7 @@ openssl rsa -in auth/src/main/resources/keys/private.pem -pubout -out auth/src/m
 | `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_DATABASE` | MySQL 地址                  | `localhost` / `3306` / `codesight` |
 | `MYSQL_USERNAME` / `MYSQL_PASSWORD`            | MySQL 凭证                  | `root` / `123456`                  |
 | `ES_URI`                                       | Elasticsearch 地址          | `http://localhost:9200`            |
-| `ES_USERNAME` / `ES_PASSWORD`                  | ES 认证凭证                 | 无默认值，**必须设置**             |
+| `ES_USERNAME` / `ES_PASSWORD`                  | ES 认证凭证                 | 本地 Docker 默认未开启认证，可留空
 | `OPENAI_BASE_URL` / `OPENAI_API_KEY`           | OpenAI 兼容接入点地址与密钥 | 必填                               |
 | `OPENAI_CHAT_MODEL` / `OPENAI_EMBEDDING_MODEL` | 对话模型 / 向量模型名       | 必填                               |
 | `OSS_ACCESS_KEY_ID` / `OSS_ACCESS_KEY_SECRET`  | 阿里云 OSS 凭证             | 必填                               |
@@ -249,14 +249,14 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 
 - **通用三级缓存模板（MultiLevelCacheTemplate）**：
   - **分层递进架构**：泛型抽象统一纳管 `L1 Caffeine (JVM 堆内存) → L2 Redis (分布式网络缓存) → L3 Loader (数据库回源加载)`；
-  - **SingleFlight 并发归并防击穿**：基于 `ConcurrentHashMap` 与 `CompletableFuture` 实现，缓存失效突发高并发时，同一 Key 仅放行首个虚拟线程执行物理回源加载，其余并发请求挂起并复用同一结果，将穿透压力收敛为常数级；
-  - **立体防御机制**：查询为空时写入短期哨兵占位符（防穿透）；Redis Key 注入基于业务基础 TTL 的 0~15% 动态随机抖动（防雪崩）。
+  - **SingleFlight 并发归并防击穿**：基于 JVM 内存 `ConcurrentHashMap` 与 `CompletableFuture` 实现，缓存失效突发高并发时，单实例内同一 Key 仅放行首个虚拟线程执行物理回源加载，其余并发请求挂起并复用同一结果，将单机穿透压力收敛为常数级；
+  - **防护机制**：查询为空时写入短期哨兵占位符（防穿透）；Redis Key 注入基于业务基础 TTL 的 0~15% 动态随机抖动（防雪崩）。
 - **分布式接口限流（@RateLimit）**：
   - 基于自定义注解 `@RateLimit(maxRequests, windowSeconds)` 与 Spring MVC `HandlerInterceptor` 拦截机制；
   - 结合 Redis + Lua 脚本（`lua/rate_limit.lua`）执行原子固定窗口计数；
   - 穿透多层反向代理动态提取真实客户端 IP，按 `IP + URI` 进行精确维度频控，超限自动拦截并抛出 `RATE_LIMIT_EXCEEDED` 统一业务异常。
 - **Web 上下文无感参数解析**：
-  - `@CurrentUserId`：自定义 `HandlerMethodArgumentResolver`，自动从 Spring Security 的 `SecurityContextHolder` / JWT 凭证中解析当前登录用户 ID 并注入 Controller 方法参数，业务逻辑与安全框架彻底解耦；
+  - `@CurrentUserId`：自定义 `HandlerMethodArgumentResolver`，自动从 Spring Security 的 `SecurityContextHolder` / JWT 凭证中解析当前登录用户 ID 并注入 Controller 方法参数，使业务逻辑与安全框架解耦；
   - `ClientInfo`：自动解析请求头中的真实客户端 IP、设备类型与 User-Agent，生成结构化上下文对象，供登录审计与风控分析无感复用。
 - **统一响应与全链路异常体系**：
   - 基于 `ResponseBodyAdvice`（`GlobalResponseAdvice`）对 Controller 返回值自动包裹为统一契约 `Result<T>`（成功 `code="SUCCESS"`），自动排除 Swagger / Knife4j 接口与纯字符串响应；
@@ -289,12 +289,12 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
     </picture>
   </div>
 
-  - **推荐池动态治理**：维护 Redis ZSET `feed:recommend:pool`（Top-3000）推荐池；互动事件实时驱动加权（浏览 1.0 / 点赞 5.0 / 收藏 8.0 / 评论 10.0）；每 15 分钟通过 Lua 脚本原子衰减（×0.9，低于 1.0 移出）；低水位（<500）自动从 MySQL 回灌，每 60 秒将脏文章计数与 `rank_score` 批量回写 MySQL；
-  - **用户会话 Buffer**：登录用户推荐流接入专属 Redis List 缓存队列（`feed:user:buffer:{userId}`，TTL 15 分钟），将召回精排与切片分页彻底解耦。初次加载或耗尽时，从推荐池中进行至多 8 轮拉取，经双向向量精排后批量写入 60 篇候选至 Buffer；翻页直接按 offset 内存切片读取；
+  - **推荐池动态治理**：维护 Redis ZSET `feed:recommend:pool`（Top-3000）推荐池；新发布文章赋予 10.0 初始底分即时入池（结合最新流实现冷启动曝光）；互动事件实时驱动加权（浏览 1.0 / 点赞 5.0 / 收藏 8.0 / 评论 10.0（预留））；每 15 分钟通过 Lua 脚本原子衰减（×0.9，低于 1.0 移出）；低水位（<500）自动从 MySQL 回灌，每 60 秒将脏文章计数与 `rank_score` 批量回写 MySQL；
+  - **用户会话 Buffer**：登录用户推荐流接入专属 Redis List 缓存队列（`feed:user:buffer:{userId}`，TTL 15 分钟），将召回精排与切片分页解耦。初次加载或耗尽时，从推荐池中进行至多 8 轮拉取，经双向向量精排后批量写入 60 篇候选至 Buffer（按每页 10 条可覆盖 6 页）；翻页直接按 offset 内存切片读取；
   - **已读曝光过滤**：基于 Redis 维护用户滑动窗口内的已读曝光 ID 集合，推荐召回后动态剔除已读文章，保障推送新鲜度；
-  - **AI 双向向量感知（负向语义剪枝 + 正向加权精排）**：
-    - *负向语义剪枝*：提取用户标记不感兴趣（dislike）的负向向量，候选文章若与负向向量余弦相似度 ≥0.85，直接在召回层执行**语义剪枝**（不仅过滤单篇文章，更泛化屏蔽同类语义主题）；
-    - *正向加权精排*：与用户正向互动滑动窗口向量计算相似度，按 $\text{Score} = 0.4 \times \text{SimilarityScore} + 0.6 \times \text{RankScore}$ 综合加权精排；
+  - **双向向量感知（负向语义剪枝 + 正向加权精排）**：
+    - *负向语义剪枝（多锚点独立比对）*：滑动窗口保留用户负向反馈向量，候选文章若与任一负向向量余弦相似度 ≥0.85，直接在召回层执行**语义剪枝**；
+    - *正向加权精排（单锚点聚合）*：滑动窗口内正向文章向量聚合归一化为动态兴趣质心，按 $\text{Score} = 0.4 \times \text{SimilarityScore} + 0.6 \times \text{RankScore}$ 综合加权精排；
   - **游客模式与并发装配**：未登录用户直接基于 Redis 推荐池绝对热度分值与 `rec:` Keyset 游标消费；由 `ArticleFeedHydrator` 批量并发组装创作者信息、16B SDS 实时计数与位图点赞/收藏状态。
 - **最新发布流（Keyset 游标寻址）**：适用全站或特定分类/标签下的时间序浏览；基于 MySQL 复合索引 `(status, publish_time, id)` 或 `(category_id, status, publish_time)`，利用 `publishTimeMillis + articleId` 双字段构建无偏移游标（时间相同以 ID 稳定决胜 Tie-breaker），避免深分页物理扫描与翻页过程中的数据重复/漏读漂移。
 - **社交关注流（推拉结合）**：
@@ -307,7 +307,7 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
     </picture>
   </div>
 
-  - 专为关注好友与创作者场景设计。普通创作者发布走写扩散（推模式，写入粉丝收件箱）；**大 V 双阈值状态机**（粉丝 ≥5500 晋升只写发件箱走拉模式、<4500 降级回退写扩散），中间 1000 缓冲带防临界抖动；
+  - 专为关注好友与创作者场景设计。普通创作者发布走写扩散（推模式，写入粉丝收件箱）；**大 V 双阈值状态机**（基于单用户 5000 关注上限设定基线，读写上限同量级，粉丝 ≥5500 晋升只写发件箱走拉模式、<4500 降级回退写扩散），中间 1000 缓冲带防临界抖动；
   - 读取时通过 Redis Pipeline 归并个人收件箱与全部关注大 V 发件箱，并按时间戳倒序归并去重；关注/取关事务提交后异步触发收件箱回填与清理。
 
 ### 关注关系（relation）
@@ -328,17 +328,17 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
   </picture>
 </div>
 
-- **16B SDS 计数快照**：Redis 定长 16 字节 String（4 个指标 × 4 字节大端 uint32）。文章维度：浏览/点赞/评论/收藏；用户维度：获阅读/获赞/粉丝/关注，具备可拓展性
+- **16B SDS 计数快照**：Redis 定长 16 字节 String（4 个指标 × 4 字节大端 uint32）。文章维度：浏览/点赞/评论（预留）/收藏；用户维度：获阅读/获赞/粉丝/关注，具备可拓展性
 - **分片位图判重**：点赞/收藏/关注按 `userId/32768` 分片存储位图（每片 4KB），`lua/toggle_bit.lua` 原子翻转，状态真实变化才产生计数事件。
 - **Kafka 削峰聚合**：计数事件发往 `counter-events` 主题（3 分区，按实体键分区保序）；消费者写入 Hash 聚合桶，每秒批量刷写 SDS（`incr_field.lua` / `decr_field.lua`）。
 - **PV 防刷**：按用户/IP 5 分钟窗口去重后才累加浏览量，文章浏览同步累加作者"获阅读"。
-- **双模式自愈重建**：① 运行时局部自愈：计数缺失时经 Redisson 分布式锁防击穿，路由到各业务模块的 `CounterRebuilder` SPI（文章/用户）取真值回填；② 灾难全量回放：开启 `counter.rebuild.enabled=true` 激活 `CounterRebuildConsumer`，采用动态时间戳 Group ID 从 `earliest` 位点全量重放 Kafka 历史事件，按事件溯源重新执行 4KB 分片位图翻转，仅在状态真实变动（`bitChanged==1`）时累加 16B SDS，天然幂等，支撑 Redis 极端灾难宕机下的秒级全量状态自愈。
+- **双模式自愈重建**：① 运行时局部自愈：计数缺失时经 Redisson 分布式锁防击穿，路由到各业务模块的 `CounterRebuilder` SPI（文章/用户）取真值回填；② 灾难回放自愈：开启 `counter.rebuild.enabled=true` 激活 `CounterRebuildConsumer`，采用动态时间戳 Group ID 从 `earliest` 位点重放 Kafka 历史事件，按事件溯源重新执行 4KB 分片位图翻转，仅在状态真实变动（`bitChanged==1`）时累加 16B SDS，天然幂等，在事件保留周期内支持基于事件溯源的幂等状态自愈与快照重建。
 
 ### 全文检索（search）
 
 - **索引同步**：文章发布/更新经 Kafka `article-search-sync` 事件驱动单篇写入 ES（`Refresh.WaitFor`）；向量生成后经 `article-vector-sync` 事件局部更新 `article_vector` 字段；服务启动时若索引为空，按 ID 游标分批（100/批）从 MySQL 全量回灌。
 - **索引结构** `codesight_article_index`：标题/正文/摘要（CJK 分析）、标签、作者、计数、状态、**1536 维 dense_vector（Cosine）**。
-- **混合检索**：`multi_match`（title^3 / tags^2 / summary / body）+ `function_score`（点赞数、浏览量 log1p 加权）；登录用户开启混合检索时对查询词向量化并追加 KNN，用 **RRF（k=60）**融合排序；Embedding 带 **300ms 超时熔断**，超时自动降级纯 BM25；支持高亮与 `search_after` 深度分页。
+- **混合检索**：`multi_match`（title^3 / tags^2 / summary / body）+ `function_score`（点赞数、浏览量 log1p 加权）；登录用户开启混合检索时对查询词向量化并追加 KNN，用 **RRF（k=60）**融合排序；Embedding 带 **300ms 异步超时保护**，超时自动降级纯 BM25；支持高亮与 `search_after` 深度分页。
 - **相关推荐**：基于当前文章向量的 KNN Top-5，无向量时降级按发布时间取最新。
 - **RAG 知识召回**：`searchRelevantArticles` 对提问向量化后 KNN 召回，供 ai 模块生成引用答案。
 
@@ -352,7 +352,7 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 - **ai 应用层**（全部基于 OpenAI 兼容协议的 ChatModel，模型由环境变量指定）：
   - `POST /api/v1/ai/chat/stream`：**单篇伴读问答**，SSE 流式返回；服务端无状态，多轮历史与文章上下文由前端直传（正文超 30000 字符截断）。
   - `POST /api/v1/ai/chat/suggest-questions`：**智能追问推荐**，同步返回 3 条 ≤10 字的追问短语。
-  - `POST /api/v1/ai/chat/rag`：**全站知识库 RAG 问答**，SSE 流式返回。流程：提问向量化 → ES KNN 召回 3 篇站内文章 → 组装带《文章标题》引用标注的提示词 → 流式生成；无命中文档时明确告知站内暂无收录。
+  - `POST /api/v1/ai/chat/rag`：**全站知识库 RAG 问答**，SSE 流式返回。流程：提问向量化 → ES KNN 召回 3 篇站内文章（单篇截取 800 字，3 篇约 2400 字，贴合上下文成本并防注意力稀释） → 组装带《文章标题》引用标注的提示词 → 流式生成；无命中文档时明确告知站内暂无收录。
 
 ### 对象存储（storage）
 
@@ -408,7 +408,7 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 - **实验目标**：验证冷数据瞬时突发涌入时，详情读路径上两道相互独立防线的收敛能力：`MultiLevelCacheTemplate` 的 SingleFlight 将并发请求合并为单次静态元数据回源（文章 + 标签关联 + 标签共 3 条 SELECT）；计数 16B SDS 缺失时由 `CounterRebuilder`（Redisson 分布式锁 + 双重检查）收敛为单次快照重建。
 - **测试方法**：针对 L1/L2 缓存中均不存在的冷数据文章 ID（`2100000000000099999`），80 个并发虚拟用户各发起 1 次瞬时突发请求（`per-vu-iterations`）。
 - **实测结果**：
-  - **回源收敛**：80 个并发请求被合并为 **1 次**数据库回源与存盘重建，其余请求挂起等待单飞任务完成后复用同一结果（可用 MySQL `SHOW GLOBAL STATUS LIKE 'Com_select'` 前后增量复核）；
+  - **回源收敛**：单实例内 80 个并发请求被合并为 **1 次**数据库回源与存盘重建，其余请求挂起等待单飞任务完成后复用同一结果（可用 MySQL `SHOW GLOBAL STATUS LIKE 'Com_select'` 前后增量复核）；
   - **业务可用性**：80 次请求全部返回 HTTP 200，请求错误率为 **0.00%**；
   - **结论**：瞬时突发被收敛为单次 DB 查询，避免了连接池耗尽与缓存击穿雪崩。
 
@@ -425,10 +425,10 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 | **P50 响应延迟**   | **96.21ms**                     | **458.89ms**                    | **P50 延迟降低 79.0%**，排队耗时平稳收敛     |
 | **P90 响应延迟**   | **108.03ms**                    | **617.77ms**                    | **P90 延迟降低 82.5%**                       |
 | **P95 响应延迟**   | **112.80ms**                    | **2,680.00ms (2.68s)**          | **长尾延迟降低 95.8%** (避免行锁级联排队)    |
-| **最大耗时 (Max)** | **1,030.00ms (1.03s)**          | **8,750.00ms (8.75s)**          | 传统 DB 行锁竞争引发极度长尾阻塞             |
-| **请求错误率**     | **0.00%**                       | **12.11%** (960 次失败)         | **高并发可用性优势显著** (DB 连接池与锁超时) |
+| **最大耗时 (Max)** | **1,030.00ms (1.03s)**          | **8,750.00ms (8.75s)**          | 传统 DB 行锁竞争引发长尾排队                 |
+| **请求错误率**     | **0.00%**                       | **12.11%** (960 次失败)         | DB 连接池耗尽与锁超时导致 960 次请求失败      |
 
-#### 混合检索 300ms 超时熔断降级实测
+#### 混合检索 300ms 超时降级实测
 
 - **实验目标**：验证在外部大模型 Embedding 接口发生网络抖动或超时故障时，搜索服务能否在 300ms 门限内自动降级，避免阻塞上游调用方。
 - **测试方法**：在 Mock AI 服务端动态注入 1000ms 延时，对比无延时正常场景与故障场景下的检索接口延迟与召回状态。
@@ -437,9 +437,9 @@ java -jar app/target/app-0.0.1-SNAPSHOT.jar
 | 检索模式         | Embedding 状态              | 平均响应耗时 | 召回结果        | 错误率 | 降级行为                                                   |
 |:-----------------|:----------------------------|:-------------|:----------------|:-------|:-----------------------------------------------------------|
 | **正常混合检索** | 0ms（正常返回 1536 维向量） | **35.64ms**  | 正常召回（5条） | 0.00%  | 执行 RRF 倒数排名融合（Dense Vector + BM25）               |
-| **故障降级检索** | 1000ms（模拟超时故障）      | **327.00ms** | 正常召回（5条） | 0.00%  | 触发 300ms `TimeoutException` 熔断，自动降级为纯 BM25 检索 |
+| **故障降级检索** | 1000ms（模拟超时故障）      | **327.00ms** | 正常召回（5条） | 0.00%  | 捕获 300ms `TimeoutException` 超时，自动降级为纯 BM25 检索 |
 
-- **结论**：即便外部 AI 模型响应严重滞后（>1s），全文检索服务通过 `CompletableFuture.supplyAsync(...).get(300, TimeUnit.MILLISECONDS)` 在 300ms 内触发熔断并平滑降级为 BM25 关键词检索，请求成功率保持 100%，避免级联雪崩。
+- **结论**：即便外部 AI 模型响应严重滞后（>1s），全文检索服务通过 `CompletableFuture.supplyAsync(...).get(300, TimeUnit.MILLISECONDS)` 在 300ms 内超时降级为 BM25 关键词检索，请求成功率保持 100%，避免级联阻塞上游。
 
 ### 压测脚本与复现
 
