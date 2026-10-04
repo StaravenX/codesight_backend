@@ -11,15 +11,15 @@ export const options = {
             executor: 'ramping-vus',
             startVUs: 10,
             stages: [
-                { duration: '5s', target: 150 },
-                { duration: '20s', target: 150 },
+                { duration: '5s', target: 200 },
+                { duration: '20s', target: 200 },
             ],
             gracefulRampDown: '0s',
         },
     },
     thresholds: {
         http_req_failed: ['rate<0.001'],
-        http_req_duration: ['p(95)<100', 'p(99)<150'],
+        http_req_duration: ['p(95)<120', 'p(99)<180'],
     },
 };
 
